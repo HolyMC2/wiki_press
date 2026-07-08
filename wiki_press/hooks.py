@@ -11,13 +11,20 @@ app_license = "MIT"
 required_apps = ["wiki"]
 
 doc_events = {
-    # Rebuild books watching a space when a Change Request merges. The
-    # enqueue is deduplicated by job_id, so a burst of merges costs one build.
-    "Wiki Change Request": {"on_update": "wiki_press.builder.handle_cr_merge"},
+    # On CR merge: rebuild watching books + publish to configured git repos.
+    # Both enqueues are deduplicated by job_id, so a burst of merges costs
+    # one build / one push.
+    "Wiki Change Request": {"on_update": "wiki_press.events.on_change_request_update"},
 }
 
-# --- planned wiring (kept explicit so the roadmap is visible in code) -------
-# P3 git publish: same merge event -> export space tree to the content repo.
-# P3 tenant pull: scheduler_events cron pulling git_synced spaces.
-# P3 canonical SEO: template override injecting <link rel="canonical"> on
-#   synced-space pages when site_config wiki_canonical_base is set.
+scheduler_events = {
+    "cron": {
+        # Tenant freshness: pull every enabled Wiki Pull Source. Upstream's
+        # GitHub sync only has webhook/manual triggers; this adds the cron.
+        "*/30 * * * *": ["wiki_press.git_pull.pull_all_enabled"],
+    },
+}
+
+# Rewrites canonical_url on wiki pages when site_config wiki_canonical_base
+# is set (tenant sites only — the master leaves it unset).
+update_website_context = ["wiki_press.seo.update_canonical"]

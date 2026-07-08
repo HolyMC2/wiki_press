@@ -1,0 +1,93 @@
+{
+ "actions": [],
+ "autoname": "format:WPT-{#####}",
+ "creation": "2026-07-08 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "space",
+  "enabled",
+  "column_break_1",
+  "remote_url",
+  "branch",
+  "docs_subdir",
+  "state_section",
+  "last_pushed_on",
+  "last_pushed_sha"
+ ],
+ "fields": [
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Wiki Space",
+   "options": "Wiki Space",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Plain URL, no credentials. https pushes take the token from site_config wiki_press_git_token.",
+   "fieldname": "remote_url",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Remote URL",
+   "reqd": 1
+  },
+  {
+   "default": "main",
+   "fieldname": "branch",
+   "fieldtype": "Data",
+   "label": "Branch"
+  },
+  {
+   "fieldname": "docs_subdir",
+   "fieldtype": "Data",
+   "label": "Docs Subdirectory"
+  },
+  {
+   "fieldname": "state_section",
+   "fieldtype": "Section Break",
+   "label": "Last Push"
+  },
+  {
+   "fieldname": "last_pushed_on",
+   "fieldtype": "Datetime",
+   "label": "Last Pushed On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_pushed_sha",
+   "fieldtype": "Data",
+   "label": "Last Pushed SHA",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-07-08 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Wiki Press",
+ "name": "Wiki Publish Target",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
