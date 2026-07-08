@@ -1,0 +1,20 @@
+[project]
+name = "wiki_press"
+authors = [{ name = "docomexico" }]
+description = "Companion app for Frappe Wiki: whole-book PDF export, git publish, canonical SEO, contextual help"
+requires-python = ">=3.10"
+readme = "README.md"
+dynamic = ["version"]
+dependencies = [
+    # weasyprint is required for the book PDF exporter (P2). Declared here so
+    # image bakes pick it up; pango/cairo native libs already ship in the
+    # bench image (verified P0 2026-07-07).
+    "weasyprint~=68.0",
+    "pygments",
+]
+
+[build-system]
+requires = ["flit_core >=3.4,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.bench.dev-dependencies]
