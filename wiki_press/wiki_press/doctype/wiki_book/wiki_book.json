@@ -1,0 +1,196 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:WB-{#####}",
+ "creation": "2026-07-07 20:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "subtitle",
+  "space",
+  "root_document",
+  "column_break_1",
+  "language",
+  "paper_size",
+  "version_label",
+  "cover_image",
+  "options_section",
+  "include_toc",
+  "toc_depth",
+  "column_break_2",
+  "public_download",
+  "auto_rebuild_on_merge",
+  "custom_css_section",
+  "custom_css",
+  "build_section",
+  "last_built_on",
+  "last_built_file",
+  "content_hash"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "subtitle",
+   "fieldtype": "Data",
+   "label": "Subtitle"
+  },
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Wiki Space",
+   "options": "Wiki Space",
+   "reqd": 1
+  },
+  {
+   "description": "Optional: export only this subtree instead of the whole space",
+   "fieldname": "root_document",
+   "fieldtype": "Link",
+   "label": "Root Document",
+   "options": "Wiki Document"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "es",
+   "fieldname": "language",
+   "fieldtype": "Select",
+   "label": "Language",
+   "options": "es\nen"
+  },
+  {
+   "default": "Letter",
+   "fieldname": "paper_size",
+   "fieldtype": "Select",
+   "label": "Paper Size",
+   "options": "Letter\nA4"
+  },
+  {
+   "description": "Printed on the cover, e.g. v2026.07",
+   "fieldname": "version_label",
+   "fieldtype": "Data",
+   "label": "Version Label"
+  },
+  {
+   "fieldname": "cover_image",
+   "fieldtype": "Attach Image",
+   "label": "Cover Image"
+  },
+  {
+   "fieldname": "options_section",
+   "fieldtype": "Section Break",
+   "label": "Options"
+  },
+  {
+   "default": "1",
+   "fieldname": "include_toc",
+   "fieldtype": "Check",
+   "label": "Include Table of Contents"
+  },
+  {
+   "default": "3",
+   "fieldname": "toc_depth",
+   "fieldtype": "Int",
+   "label": "TOC Depth"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "Store the built PDF as a public file. Guests can only download it when the space itself grants the Guest role.",
+   "fieldname": "public_download",
+   "fieldtype": "Check",
+   "label": "Public Download"
+  },
+  {
+   "default": "1",
+   "fieldname": "auto_rebuild_on_merge",
+   "fieldtype": "Check",
+   "label": "Auto Rebuild on Merge"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "custom_css_section",
+   "fieldtype": "Section Break",
+   "label": "Custom CSS"
+  },
+  {
+   "fieldname": "custom_css",
+   "fieldtype": "Code",
+   "label": "Custom CSS",
+   "options": "CSS"
+  },
+  {
+   "fieldname": "build_section",
+   "fieldtype": "Section Break",
+   "label": "Last Build"
+  },
+  {
+   "fieldname": "last_built_on",
+   "fieldtype": "Datetime",
+   "label": "Last Built On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_built_file",
+   "fieldtype": "Data",
+   "label": "Last Built File",
+   "read_only": 1
+  },
+  {
+   "fieldname": "content_hash",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Content Hash",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-07-07 20:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Wiki Press",
+ "name": "Wiki Book",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Wiki Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
