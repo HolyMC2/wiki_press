@@ -26,5 +26,7 @@ scheduler_events = {
 }
 
 # Rewrites canonical_url on wiki pages when site_config wiki_canonical_base
-# is set (tenant sites only — the master leaves it unset).
-update_website_context = ["wiki_press.seo.update_canonical"]
+# is set (tenant sites only — the master leaves it unset). Doctype-class
+# override because WikiDocumentRenderer bypasses the website context
+# pipeline (update_website_context never fires for wiki pages).
+override_doctype_class = {"Wiki Document": "wiki_press.overrides.WikiDocumentCanonical"}
