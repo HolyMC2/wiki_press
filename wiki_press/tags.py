@@ -44,15 +44,22 @@ def reindex_on_tag_change(doc, method=None):
 		pass  # search freshness is best-effort; never block a save
 
 
+MAX_TAGGED_ROWS = 2000
+
+
 def accessible_tagged_documents(tag: str | None = None) -> dict[str, list[dict]]:
-	"""Tag -> published+readable documents map for the /etiquetas page."""
+	"""Tag -> published+readable documents map for the /etiquetas page.
+
+	Capped and space-access-filtered. Longest-route-first space matching so
+	``manual-usuario`` wins over ``manual`` for a page under it.
+	"""
 	from wiki.permissions import can_read_space
 
 	rows = frappe.get_all(
 		"Wiki Document Tag",
 		filters={"parenttype": "Wiki Document", **({"tag": tag} if tag else {})},
 		fields=["tag", "parent"],
-		limit_page_length=0,
+		limit_page_length=MAX_TAGGED_ROWS,
 	)
 	if not rows:
 		return {}
@@ -66,22 +73,31 @@ def accessible_tagged_documents(tag: str | None = None) -> dict[str, list[dict]]
 		)
 	}
 
-	space_of_route: dict[str, str | None] = {}
-	spaces = frappe.get_all("Wiki Space", fields=["name", "route"])
+	# Longest route first so a nested space (manual-usuario) matches before a
+	# prefix-colliding parent (manual). Prevents leaking a private page into a
+	# public space's readable set via a bad prefix match.
+	spaces = sorted(
+		frappe.get_all("Wiki Space", fields=["name", "route"]),
+		key=lambda s: len(s.route or ""),
+		reverse=True,
+	)
 
 	def space_for(doc_route: str) -> str | None:
 		for s in spaces:
-			if doc_route == s.route or doc_route.startswith(s.route + "/"):
+			if doc_route == s.route or doc_route.startswith((s.route or "") + "/"):
 				return s.name
 		return None
 
+	space_of_route: dict[str, str | None] = {}
 	readable_space: dict[str, bool] = {}
 	result: dict[str, list[dict]] = {}
 	for row in rows:
 		doc = docs.get(row.parent)
 		if not doc or not doc.route:
 			continue
-		sp = space_of_route.setdefault(doc.route, space_for(doc.route))
+		if doc.route not in space_of_route:
+			space_of_route[doc.route] = space_for(doc.route)
+		sp = space_of_route[doc.route]
 		if not sp:
 			continue
 		if sp not in readable_space:

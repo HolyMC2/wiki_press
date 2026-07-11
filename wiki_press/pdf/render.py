@@ -100,7 +100,14 @@ def _hardened_url_fetcher(url: str):
 		site_rel = _to_site_relative(path)
 		if site_rel and resolve_local_file(site_rel) == os.path.realpath(path):
 			return default_url_fetcher(url)
-	raise ValueError(f"wiki_press: blocked external resource in book render: {url[:120]}")
+	# Disallowed (external / out-of-site) resource: return an empty stand-in
+	# instead of raising, so ONE bad reference can't abort the whole book
+	# build. Nothing is fetched — SSRF/local-file exfil stays blocked.
+	frappe.log_error(
+		message=f"wiki_press: blocked resource in book render: {url[:200]}",
+		title="Wiki Press book render",
+	)
+	return {"string": b"", "mime_type": "application/octet-stream"}
 
 
 def _to_site_relative(path: str) -> str | None:

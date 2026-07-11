@@ -113,9 +113,18 @@ def publish_target(target_name: str) -> dict:
 	if not target.enabled:
 		return {"pushed": False, "reason": "disabled"}
 
+	from wiki_press.git_repo import validate_subdir
+
+	validate_subdir(target.docs_subdir)
 	clone = ensure_work_clone(target.remote_url, target.branch or "main", f"publish-{target.name}")
 	subdir = (target.docs_subdir or "").strip("/")
 	root = os.path.join(clone, subdir) if subdir else clone
+	# Defense in depth: the export wipes markdown+assets under `root`; make
+	# certain that never escapes the clone even if validation is bypassed.
+	if os.path.realpath(root) != os.path.realpath(clone) and not os.path.realpath(root).startswith(
+		os.path.realpath(clone) + os.sep
+	):
+		frappe.throw("Resolved docs_subdir escapes the repository root")
 	os.makedirs(root, exist_ok=True)
 
 	export_space_to_worktree(target.space, root)
@@ -124,6 +133,7 @@ def publish_target(target_name: str) -> dict:
 	sha = commit_and_push(
 		clone,
 		target.branch or "main",
+		target.remote_url,
 		f"wiki_press: publish {space_title} ({frappe.utils.now()})",
 	)
 	if sha:

@@ -68,10 +68,12 @@ def download_book(book: str):
 	"""
 	doc = frappe.get_doc("Wiki Book", book)
 	is_guest = frappe.session.user in (None, "", "Guest")
+	# Every not-permitted / not-ready path returns 404 so a guest cannot
+	# distinguish a real private book from a nonexistent name (no existence
+	# leak across sequential WB-##### ids).
 	if is_guest and not doc.public_download:
-		frappe.throw("Not permitted", frappe.PermissionError)
+		frappe.throw("Not found", frappe.DoesNotExistError)
 	if not can_read_space(doc.space):
-		# 404, not 403 — same no-existence-leak behavior as the wiki itself
 		frappe.throw("Not found", frappe.DoesNotExistError)
 	if not doc.last_built_file:
 		frappe.throw("Not found", frappe.DoesNotExistError)
