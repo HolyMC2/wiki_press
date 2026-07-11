@@ -10,6 +10,10 @@ app_license = "MIT"
 
 required_apps = ["wiki"]
 
+app_include_js = ["/assets/wiki_press/js/wiki_press_help.js"]
+
+fixtures = [{"dt": "Wiki Help Mapping"}]
+
 doc_events = {
     # On CR merge: rebuild watching books + publish to configured git repos.
     # Both enqueues are deduplicated by job_id, so a burst of merges costs

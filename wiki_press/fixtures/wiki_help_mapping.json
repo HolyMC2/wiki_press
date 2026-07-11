@@ -1,0 +1,74 @@
+[
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00001",
+  "context_type": "DocType",
+  "context_key": "Sales Invoice",
+  "wiki_route": "manual/punto-de-venta/cobrar-una-venta",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00002",
+  "context_type": "DocType",
+  "context_key": "POS Invoice",
+  "wiki_route": "manual/punto-de-venta/cobrar-una-venta",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00003",
+  "context_type": "DocType",
+  "context_key": "Customer",
+  "wiki_route": "manual/ventas-y-clientes/clientes-y-cotizaciones",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00004",
+  "context_type": "DocType",
+  "context_key": "Quotation",
+  "wiki_route": "manual/ventas-y-clientes/clientes-y-cotizaciones",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00005",
+  "context_type": "DocType",
+  "context_key": "Item",
+  "wiki_route": "manual/inventario/recepción-de-mercancía",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00006",
+  "context_type": "DocType",
+  "context_key": "Stock Reconciliation",
+  "wiki_route": "manual/inventario/conteo-de-inventario",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00007",
+  "context_type": "DocType",
+  "context_key": "Purchase Receipt",
+  "wiki_route": "manual/inventario/recepción-de-mercancía",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00008",
+  "context_type": "DocType",
+  "context_key": "User",
+  "wiki_route": "manual/administración/usuarios-y-permisos",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00009",
+  "context_type": "DocType",
+  "context_key": "*",
+  "wiki_route": "manual",
+  "enabled": 1
+ }
+]

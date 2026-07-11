@@ -1,0 +1,73 @@
+{
+ "actions": [],
+ "autoname": "format:WHM-{#####}",
+ "creation": "2026-07-10 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "context_type",
+  "context_key",
+  "column_break_1",
+  "wiki_route",
+  "enabled"
+ ],
+ "fields": [
+  {
+   "fieldname": "context_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Context Type",
+   "options": "DocType\nDesk Page\nPOS Screen\nStorefront Page",
+   "reqd": 1
+  },
+  {
+   "description": "Exact key (e.g. Sales Invoice). Use * as per-type fallback.",
+   "fieldname": "context_key",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Context Key",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Site-relative manual route, e.g. manual/punto-de-venta/cobrar-una-venta",
+   "fieldname": "wiki_route",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Wiki Route",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  }
+ ],
+ "links": [],
+ "modified": "2026-07-10 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Wiki Press",
+ "name": "Wiki Help Mapping",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "All"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

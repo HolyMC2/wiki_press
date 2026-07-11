@@ -36,6 +36,29 @@ def build_book_now(book: str) -> dict:
 	return build(doc.name)
 
 
+@frappe.whitelist()
+def get_help_url(context_type: str, context_key: str) -> str | None:
+	"""Resolve a manual URL for an ERP context. Fallbacks: exact mapping ->
+	per-type wildcard (*) -> site_config wiki_help_base_url -> None.
+
+	Returns a site-relative route when the manual is synced locally, or an
+	absolute URL when wiki_help_base_url points at the master docs domain.
+	"""
+
+	def lookup(key):
+		return frappe.db.get_value(
+			"Wiki Help Mapping",
+			{"context_type": context_type, "context_key": key, "enabled": 1},
+			"wiki_route",
+		)
+
+	route = lookup(context_key) or lookup("*")
+	base = (frappe.conf.get("wiki_help_base_url") or "").rstrip("/")
+	if route:
+		return f"{base}/{route}" if base else f"/{route}"
+	return base or None
+
+
 @frappe.whitelist(allow_guest=True)
 def download_book(book: str):
 	"""Serve the LAST BUILT PDF. Never builds on demand (guest DoS guard).
