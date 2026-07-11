@@ -127,7 +127,7 @@ def publish_target(target_name: str) -> dict:
 		f"wiki_press: publish {space_title} ({frappe.utils.now()})",
 	)
 	if sha:
-		target.db_set({"last_pushed_sha": sha, "last_pushed_on": frappe.utils.now()}, commit=True)
+		target.db_set({"last_pushed_sha": sha, "last_pushed_on": frappe.utils.now()})
 	return {"pushed": bool(sha), "sha": sha}
 
 

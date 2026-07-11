@@ -82,7 +82,7 @@ def pull_source(source_name: str) -> dict:
 	with _local_transport(clone) as git_sync:
 		git_sync.sync_space(source.space, trigger="Manual")
 
-	source.db_set({"last_synced_sha": sha, "last_synced_on": frappe.utils.now()}, commit=True)
+	source.db_set({"last_synced_sha": sha, "last_synced_on": frappe.utils.now()})
 	status = frappe.db.get_value("Wiki Space", source.space, "last_sync_status")
 	return {"synced": True, "sha": sha, "space_status": status}
 

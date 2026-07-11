@@ -52,7 +52,13 @@ def ensure_work_clone(remote_url: str, branch: str, cache_key: str) -> str:
 	An empty remote (no branch yet) yields an initialized clone on a fresh
 	local branch, so the first publish can create the branch.
 	"""
-	path = os.path.join(_cache_root(), frappe.scrub(cache_key))
+	# Key the cache by remote too: doc names can repeat (test rollbacks rewind
+	# naming series; retargeted docs keep their name) and a stale clone for a
+	# different remote silently yields "nothing to commit".
+	import hashlib
+
+	remote_key = hashlib.sha1(remote_url.encode()).hexdigest()[:10]
+	path = os.path.join(_cache_root(), f"{frappe.scrub(cache_key)}-{remote_key}")
 	url = _authenticated(remote_url)
 	if not os.path.isdir(os.path.join(path, ".git")):
 		os.makedirs(path, exist_ok=True)

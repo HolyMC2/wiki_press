@@ -23,7 +23,9 @@ BOOK_CSS = """
 }}
 @page cover {{ margin: 0; @top-center {{ content: none }} @bottom-right {{ content: none }} }}
 
-body {{ font-family: 'DejaVu Sans', sans-serif; font-size: 10pt; line-height: 1.5; color: #1a1a1a; }}
+body {{ font-family: 'DejaVu Sans', sans-serif; font-size: 10pt; line-height: 1.5; color: #1a1a1a; hyphens: auto; }}
+p, li {{ orphans: 3; widows: 3; }}
+h1, h2, h3, h4 {{ page-break-after: avoid; }}
 
 .cover {{ page: cover; page-break-after: always; padding-top: 38vh; text-align: center; }}
 .cover-title {{ font-size: 28pt; margin: 0 0 8pt 0; }}

@@ -37,7 +37,7 @@ def compute_content_hash(book, docs: list[dict]) -> str:
 
 def enqueue_build(book_name: str, task_id: str | None = None) -> None:
 	frappe.enqueue(
-		"wiki_press.builder.build",
+		"wiki_press.builder.build_job",
 		book_name=book_name,
 		task_id=task_id,
 		queue="long",
@@ -45,6 +45,21 @@ def enqueue_build(book_name: str, task_id: str | None = None) -> None:
 		job_id=f"wiki_press:build:{book_name}",
 		deduplicate=True,
 	)
+
+
+def build_job(book_name: str, task_id: str | None = None, force: bool = False) -> dict:
+	"""Queue entrypoint: records failures on the book instead of dying silently."""
+	try:
+		return build(book_name, task_id=task_id, force=force)
+	except Exception:
+		frappe.db.rollback()
+		frappe.db.set_value(
+			"Wiki Book", book_name, "last_build_error",
+			frappe.get_traceback(with_context=False)[-1000:],
+			update_modified=False,
+		)
+		frappe.db.commit()
+		raise
 
 
 def build(book_name: str, task_id: str | None = None, force: bool = False) -> dict:
@@ -78,13 +93,16 @@ def build(book_name: str, task_id: str | None = None, force: bool = False) -> di
 	progress(85, "Guardando archivo")
 	file_url = _save_book_file(book, pdf_bytes)
 
+	# No explicit commit: the RQ job wrapper / request lifecycle commits on
+	# success. Committing here broke FrappeTestCase rollback and leaked test
+	# spaces into a live site (bit docs.lab 2026-07-10).
 	book.db_set(
 		{
 			"last_built_on": frappe.utils.now(),
 			"last_built_file": file_url,
 			"content_hash": content_hash,
-		},
-		commit=True,
+			"last_build_error": "",
+		}
 	)
 	progress(100, "Listo")
 	if task_id:

@@ -85,6 +85,25 @@ class TestWikiBook(FrappeTestCase):
 		result2 = build(self.book.name)
 		self.assertTrue(result2["unchanged"])
 
+	def test_get_help_url_resolution(self):
+		suffix = frappe.generate_hash(length=8)
+		frappe.get_doc(
+			{
+				"doctype": "Wiki Help Mapping",
+				"context_type": "POS Screen",
+				"context_key": f"test-screen-{suffix}",
+				"wiki_route": "manual/punto-de-venta/cobrar-una-venta",
+			}
+		).insert()
+		from wiki_press.api import get_help_url
+
+		self.assertEqual(
+			get_help_url("POS Screen", f"test-screen-{suffix}"),
+			"/manual/punto-de-venta/cobrar-una-venta",
+		)
+		# unknown key on a type without wildcard -> None (no site_config base in tests)
+		self.assertIsNone(get_help_url("Storefront Page", f"missing-{suffix}"))
+
 	def test_content_hash_changes_with_settings(self):
 		docs = walk_space_tree(self.space.name)
 		h1 = compute_content_hash(self.book, docs)

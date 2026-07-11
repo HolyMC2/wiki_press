@@ -26,7 +26,8 @@
   "build_section",
   "last_built_on",
   "last_built_file",
-  "content_hash"
+  "content_hash",
+  "last_build_error"
  ],
  "fields": [
   {
@@ -153,6 +154,13 @@
    "fieldtype": "Data",
    "hidden": 1,
    "label": "Content Hash",
+   "read_only": 1
+  },
+  {
+   "depends_on": "last_build_error",
+   "fieldname": "last_build_error",
+   "fieldtype": "Small Text",
+   "label": "Last Build Error",
    "read_only": 1
   }
  ],
