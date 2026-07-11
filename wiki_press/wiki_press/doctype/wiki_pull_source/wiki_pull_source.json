@@ -12,8 +12,10 @@
   "branch",
   "docs_subdir",
   "state_section",
+  "last_status",
   "last_synced_on",
-  "last_synced_sha"
+  "last_synced_sha",
+  "last_error"
  ],
  "fields": [
   {
@@ -60,6 +62,12 @@
    "label": "Last Sync"
   },
   {
+   "fieldname": "last_status",
+   "fieldtype": "Data",
+   "label": "Last Status",
+   "read_only": 1
+  },
+  {
    "fieldname": "last_synced_on",
    "fieldtype": "Datetime",
    "label": "Last Synced On",
@@ -69,6 +77,13 @@
    "fieldname": "last_synced_sha",
    "fieldtype": "Data",
    "label": "Last Synced SHA",
+   "read_only": 1
+  },
+  {
+   "depends_on": "last_error",
+   "fieldname": "last_error",
+   "fieldtype": "Small Text",
+   "label": "Last Error",
    "read_only": 1
   }
  ],

@@ -12,8 +12,10 @@
   "branch",
   "docs_subdir",
   "state_section",
+  "last_status",
   "last_pushed_on",
-  "last_pushed_sha"
+  "last_pushed_sha",
+  "last_error"
  ],
  "fields": [
   {
@@ -59,6 +61,12 @@
    "label": "Last Push"
   },
   {
+   "fieldname": "last_status",
+   "fieldtype": "Data",
+   "label": "Last Status",
+   "read_only": 1
+  },
+  {
    "fieldname": "last_pushed_on",
    "fieldtype": "Datetime",
    "label": "Last Pushed On",
@@ -68,6 +76,13 @@
    "fieldname": "last_pushed_sha",
    "fieldtype": "Data",
    "label": "Last Pushed SHA",
+   "read_only": 1
+  },
+  {
+   "depends_on": "last_error",
+   "fieldname": "last_error",
+   "fieldtype": "Small Text",
+   "label": "Last Error",
    "read_only": 1
   }
  ],

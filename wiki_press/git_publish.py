@@ -20,18 +20,34 @@ from wiki_press.queries import walk_space_tree
 SITE_IMAGE_RE = re.compile(r"(!\[[^\]]*\]\()((?:/private)?/files/[^)\s]+)((?:\s+[^)]*)?\))")
 
 
+LANDING_SLUGS = {"index", "readme"}
+
+
 def _front_matter(title: str, slug: str, order: int, published: bool = True) -> str:
-	safe_title = title.replace('"', "'")
-	return (
-		f'---\ntitle: "{safe_title}"\nslug: {slug}\norder: {order}\n'
-		f"published: {'true' if published else 'false'}\n---\n\n"
+	# Serialize with a YAML dumper, not string interpolation — a title with a
+	# backslash or quote otherwise produces invalid YAML that upstream's
+	# strip_front_matter rejects, dropping metadata and leaking the raw block.
+	import yaml
+
+	meta = yaml.safe_dump(
+		{"title": title, "slug": slug, "order": order, "published": bool(published)},
+		allow_unicode=True,
+		default_flow_style=False,
+		sort_keys=False,
 	)
+	return f"---\n{meta}---\n\n"
 
 
 def _slug_of(doc: dict) -> str:
 	route = (doc.get("route") or "").rstrip("/")
 	slug = route.rsplit("/", 1)[-1] if route else ""
-	return slug or frappe.scrub(doc["title"]).replace("_", "-")
+	slug = slug or frappe.scrub(doc["title"]).replace("_", "-")
+	# A page slugged index/readme would collide with the folder-landing
+	# basename on re-import (upstream treats README/index as the folder's
+	# landing, not a standalone page). Suffix it so it stays a real page.
+	if slug in LANDING_SLUGS:
+		slug = f"{slug}-page"
+	return slug
 
 
 def _export_images(content: str, assets_dir: str, assets_rel_prefix: str) -> str:
@@ -77,12 +93,24 @@ def export_space_to_worktree(space_name: str, root: str, root_document: str | No
 
 	dir_by_docname: dict[str, str] = {}
 	order_counter: dict[str, int] = {}
+	# Slugs already used within each parent dir, so two siblings that scrub to
+	# the same slug don't overwrite each other's file.
+	used_slugs: dict[str, set] = {}
+
+	def unique_slug(parent_dir: str, slug: str) -> str:
+		taken = used_slugs.setdefault(parent_dir, set())
+		candidate, n = slug, 2
+		while candidate in taken:
+			candidate = f"{slug}-{n}"
+			n += 1
+		taken.add(candidate)
+		return candidate
 
 	for doc in docs:
 		parent_dir = dir_by_docname.get(doc.get("parent_wiki_document"), root)
 		order = order_counter.get(parent_dir, 0) + 1
 		order_counter[parent_dir] = order
-		slug = _slug_of(doc)
+		slug = unique_slug(parent_dir, _slug_of(doc))
 		# ../ hops from the file's directory back to the repo root (where
 		# assets/ lives): a group README sits `depth` levels down, a page file
 		# sits inside its parent group = depth-1 levels down.
@@ -108,37 +136,53 @@ def export_space_to_worktree(space_name: str, root: str, root_document: str | No
 
 
 def publish_target(target_name: str) -> dict:
-	"""Export + commit + push one Wiki Publish Target. Returns push info."""
+	"""Export + commit + push one Wiki Publish Target. Returns push info.
+	Records last_status/last_error on the target so a non-console operator can
+	see the outcome on the form."""
 	target = frappe.get_doc("Wiki Publish Target", target_name)
 	if not target.enabled:
 		return {"pushed": False, "reason": "disabled"}
 
 	from wiki_press.git_repo import validate_subdir
 
-	validate_subdir(target.docs_subdir)
-	clone = ensure_work_clone(target.remote_url, target.branch or "main", f"publish-{target.name}")
-	subdir = (target.docs_subdir or "").strip("/")
-	root = os.path.join(clone, subdir) if subdir else clone
-	# Defense in depth: the export wipes markdown+assets under `root`; make
-	# certain that never escapes the clone even if validation is bypassed.
-	if os.path.realpath(root) != os.path.realpath(clone) and not os.path.realpath(root).startswith(
-		os.path.realpath(clone) + os.sep
-	):
-		frappe.throw("Resolved docs_subdir escapes the repository root")
-	os.makedirs(root, exist_ok=True)
+	try:
+		validate_subdir(target.docs_subdir)
+		clone = ensure_work_clone(target.remote_url, target.branch or "main", f"publish-{target.name}")
+		subdir = (target.docs_subdir or "").strip("/")
+		root = os.path.join(clone, subdir) if subdir else clone
+		# Defense in depth: the export wipes markdown+assets under `root`; make
+		# certain that never escapes the clone even if validation is bypassed.
+		if os.path.realpath(root) != os.path.realpath(clone) and not os.path.realpath(root).startswith(
+			os.path.realpath(clone) + os.sep
+		):
+			frappe.throw("Resolved docs_subdir escapes the repository root")
+		os.makedirs(root, exist_ok=True)
 
-	export_space_to_worktree(target.space, root)
+		export_space_to_worktree(target.space, root)
 
-	space_title = frappe.db.get_value("Wiki Space", target.space, "space_name")
-	sha = commit_and_push(
-		clone,
-		target.branch or "main",
-		target.remote_url,
-		f"wiki_press: publish {space_title} ({frappe.utils.now()})",
-	)
+		space_title = frappe.db.get_value("Wiki Space", target.space, "space_name")
+		sha = commit_and_push(
+			clone,
+			target.branch or "main",
+			target.remote_url,
+			f"wiki_press: publish {space_title} ({frappe.utils.now()})",
+		)
+	except Exception:
+		err = frappe.get_traceback(with_context=False)[-1000:]
+		target.db_set({"last_status": "Error", "last_error": err})
+		raise
+	updates = {"last_status": "Success" if sha else "No Change", "last_error": ""}
 	if sha:
-		target.db_set({"last_pushed_sha": sha, "last_pushed_on": frappe.utils.now()})
+		updates.update({"last_pushed_sha": sha, "last_pushed_on": frappe.utils.now()})
+	target.db_set(updates)
 	return {"pushed": bool(sha), "sha": sha}
+
+
+@frappe.whitelist()
+def publish_now(target: str) -> dict:
+	"""Desk button on Wiki Publish Target: publish synchronously."""
+	frappe.has_permission("Wiki Publish Target", "write", throw=True)
+	return publish_target(target)
 
 
 def enqueue_publish(target_name: str) -> None:

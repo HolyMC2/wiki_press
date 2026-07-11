@@ -19,10 +19,36 @@ from wiki_press.git_repo import cat_blob, ensure_work_clone, head_sha, ls_blobs
 PLACEHOLDER_REPO = "wiki-press/local-git"
 
 
+def assert_transport_contract() -> None:
+	"""Fail loudly at rebase if upstream's fetch seam changed shape. The pull
+	mechanism monkeypatches these four module-level functions; a rename or
+	arity change would otherwise fail silently or hit real GitHub."""
+	import inspect
+
+	import wiki.wiki.git_sync as git_sync
+
+	expected = {
+		"_fetch_head_sha": ("repo", "branch", "token"),
+		"_fetch_tree": ("repo", "ref", "token"),
+		"_fetch_blob": ("repo", "sha", "token"),
+		"_fetch_blob_bytes": ("repo", "sha", "token"),
+	}
+	for name, params in expected.items():
+		fn = getattr(git_sync, name, None)
+		if fn is None:
+			frappe.throw(f"wiki_press: upstream git_sync.{name} is gone (rebase break)")
+		got = tuple(inspect.signature(fn).parameters)
+		if got != params:
+			frappe.throw(f"wiki_press: git_sync.{name}{got} != expected {params} (rebase break)")
+	if not hasattr(git_sync, "sync_space"):
+		frappe.throw("wiki_press: upstream git_sync.sync_space is gone (rebase break)")
+
+
 @contextmanager
 def _local_transport(clone_path: str):
 	import wiki.wiki.git_sync as git_sync
 
+	assert_transport_contract()
 	originals = (
 		git_sync._fetch_head_sha,
 		git_sync._fetch_tree,
@@ -60,10 +86,18 @@ def _ensure_space_sync_fields(source) -> None:
 		updates["git_synced"] = 1
 	if not space.repo_full_name:
 		updates["repo_full_name"] = PLACEHOLDER_REPO
-	if (space.branch or "") != (source.branch or "main"):
+	branch_changed = (space.branch or "") != (source.branch or "main")
+	subdir_changed = (space.docs_subdir or "") != (source.docs_subdir or "")
+	if branch_changed:
 		updates["branch"] = source.branch or "main"
-	if (space.docs_subdir or "") != (source.docs_subdir or ""):
+	if subdir_changed:
 		updates["docs_subdir"] = source.docs_subdir or ""
+	if branch_changed or subdir_changed:
+		# The sha short-circuit in sync_space compares HEAD to
+		# last_synced_commit_sha BEFORE reading the tree/subdir. A config
+		# change at the same sha would otherwise be ignored until an unrelated
+		# commit lands — clear it so the next sync re-reads the tree.
+		updates["last_synced_commit_sha"] = ""
 	if updates:
 		frappe.db.set_value("Wiki Space", source.space, updates, update_modified=False)
 
@@ -78,13 +112,70 @@ def pull_source(source_name: str) -> dict:
 	if not sha:
 		return {"synced": False, "reason": "empty remote"}
 
-	_ensure_space_sync_fields(source)
-	with _local_transport(clone) as git_sync:
-		git_sync.sync_space(source.space, trigger="Manual")
+	# Wipe guard: if the repo has NO markdown under docs_subdir but the space
+	# already holds published pages, syncing would delete the entire mirror
+	# (a subdir typo, or the master relocating its docs folder). Refuse.
+	if _repo_has_no_markdown(clone, source.docs_subdir) and _space_has_published_pages(source.space):
+		msg = (
+			f"Refusing pull: no markdown under docs_subdir "
+			f"'{source.docs_subdir or '(root)'}' but the space has published pages "
+			f"— this would wipe the mirror. Check the Pull Source subdir/branch."
+		)
+		frappe.db.set_value("Wiki Space", source.space, "last_sync_status", "Error", update_modified=False)
+		source.db_set({"last_status": "Error", "last_error": msg})
+		frappe.log_error(message=msg, title="wiki_press: pull wipe guard")
+		return {"synced": False, "reason": "wipe-guard", "detail": msg}
 
-	source.db_set({"last_synced_sha": sha, "last_synced_on": frappe.utils.now()})
+	try:
+		_ensure_space_sync_fields(source)
+		with _local_transport(clone) as git_sync:
+			git_sync.sync_space(source.space, trigger="Manual")
+	except Exception:
+		err = frappe.get_traceback(with_context=False)[-1000:]
+		source.db_set({"last_status": "Error", "last_error": err})
+		raise
+
 	status = frappe.db.get_value("Wiki Space", source.space, "last_sync_status")
+	source.db_set(
+		{
+			"last_synced_sha": sha,
+			"last_synced_on": frappe.utils.now(),
+			"last_status": status or "Success",
+			"last_error": "",
+		}
+	)
 	return {"synced": True, "sha": sha, "space_status": status}
+
+
+def _repo_has_no_markdown(clone_path: str, docs_subdir: str | None) -> bool:
+	prefix = (docs_subdir or "").strip("/")
+	prefix = f"{prefix}/" if prefix else ""
+	for blob in ls_blobs(clone_path):
+		path = blob.get("path", "")
+		if prefix and not path.startswith(prefix):
+			continue
+		if path.lower().endswith((".md", ".mdx")):
+			return False
+	return True
+
+
+def _space_has_published_pages(space: str) -> bool:
+	route = frappe.db.get_value("Wiki Space", space, "route")
+	if not route:
+		return False
+	return bool(
+		frappe.db.count(
+			"Wiki Document",
+			{"is_group": 0, "is_published": 1, "route": ["like", f"{route}/%"]},
+		)
+	)
+
+
+@frappe.whitelist()
+def pull_now(source: str) -> dict:
+	"""Desk button on Wiki Pull Source: pull synchronously."""
+	frappe.has_permission("Wiki Pull Source", "write", throw=True)
+	return pull_source(source)
 
 
 def pull_all_enabled() -> None:

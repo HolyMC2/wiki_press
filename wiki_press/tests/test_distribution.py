@@ -109,6 +109,64 @@ class TestDistributionRoundTrip(FrappeTestCase):
 		with self.assertRaises(Exception):
 			assert_space_writable(mirror_space.name)
 
+	def test_deletion_propagates_through_round_trip(self):
+		pages = {
+			"Alfa": "# Alfa\n\nse queda.\n",
+			"Beta": "# Beta\n\nse va.\n",
+		}
+		src = _make_space(f"d{self.suffix}", "rt-del", pages)
+		target = frappe.get_doc(
+			{"doctype": "Wiki Publish Target", "space": src.name,
+			 "remote_url": f"file://{self.hub}", "branch": "main", "docs_subdir": "manual"}
+		).insert()
+		mirror = _make_space(f"dm{self.suffix}", "rt-delm", {})
+		source = frappe.get_doc(
+			{"doctype": "Wiki Pull Source", "space": mirror.name,
+			 "remote_url": f"file://{self.hub}", "branch": "main", "docs_subdir": "manual"}
+		).insert()
+
+		publish_target(target.name)
+		pull_source(source.name)
+		mirrored = {d.title for d in frappe.get_all(
+			"Wiki Document", filters={"route": ["like", f"{mirror.route}/%"], "is_group": 0}, fields=["title"])}
+		self.assertEqual(mirrored, {"Alfa", "Beta"})
+
+		# unpublish Beta on the master, republish, repull
+		beta = frappe.get_doc("Wiki Document", frappe.get_all(
+			"Wiki Document", filters={"title": "Beta", "route": ["like", f"{src.route}/%"]}, pluck="name")[0])
+		beta.is_published = 0
+		beta.flags.ignore_permissions = True
+		beta.save()
+		publish_target(target.name)
+		pull_source(source.name)
+
+		mirrored = {d.title for d in frappe.get_all(
+			"Wiki Document", filters={"route": ["like", f"{mirror.route}/%"], "is_group": 0}, fields=["title"])}
+		self.assertIn("Alfa", mirrored)
+		self.assertNotIn("Beta", mirrored)
+
+	def test_wipe_guard_refuses_empty_subdir_pull(self):
+		# publish real content, then pull a mirror pointed at a WRONG subdir
+		src = _make_space(f"w{self.suffix}", "rt-wipe", {"Uno": "# Uno\n\nhola.\n"})
+		target = frappe.get_doc(
+			{"doctype": "Wiki Publish Target", "space": src.name,
+			 "remote_url": f"file://{self.hub}", "branch": "main", "docs_subdir": "manual"}
+		).insert()
+		publish_target(target.name)
+
+		mirror = _make_space(f"wm{self.suffix}", "rt-wipem", {"Preexistente": "# Preexistente\n\nno borrar.\n"})
+		source = frappe.get_doc(
+			{"doctype": "Wiki Pull Source", "space": mirror.name,
+			 "remote_url": f"file://{self.hub}", "branch": "main", "docs_subdir": "does-not-exist"}
+		).insert()
+		result = pull_source(source.name)
+		self.assertFalse(result["synced"])
+		self.assertEqual(result["reason"], "wipe-guard")
+		# the mirror's own page must survive
+		survivors = {d.title for d in frappe.get_all(
+			"Wiki Document", filters={"route": ["like", f"{mirror.route}/%"], "is_group": 0}, fields=["title"])}
+		self.assertIn("Preexistente", survivors)
+
 	def test_unchanged_second_publish_pushes_nothing(self):
 		source_space = _make_space(f"n{self.suffix}", "rt-noop", {"Única": "# Única\n\nHola.\n"})
 		target = frappe.get_doc(

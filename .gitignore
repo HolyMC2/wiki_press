@@ -1,7 +1,8 @@
-__pycache__/
-*.pyc
-*.egg-info/
-.DS_Store
-node_modules/
+.claude-flow/
 dist/
+.DS_Store
+*.egg-info/
 .env
+node_modules/
+*.pyc
+__pycache__/

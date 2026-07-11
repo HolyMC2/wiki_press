@@ -52,13 +52,22 @@ def build_job(book_name: str, task_id: str | None = None, force: bool = False) -
 	try:
 		return build(book_name, task_id=task_id, force=force)
 	except Exception:
-		frappe.db.rollback()
-		frappe.db.set_value(
-			"Wiki Book", book_name, "last_build_error",
-			frappe.get_traceback(with_context=False)[-1000:],
-			update_modified=False,
-		)
-		frappe.db.commit()
+		# Isolate the failed build and persist the error so it survives the
+		# job's own rollback. Skipped under tests, where rollback/commit would
+		# destroy the surrounding FrappeTestCase transaction.
+		if not frappe.flags.in_test:
+			frappe.db.rollback()
+		err = frappe.get_traceback(with_context=False)[-1000:]
+		frappe.db.set_value("Wiki Book", book_name, "last_build_error", err, update_modified=False)
+		if not frappe.flags.in_test:
+			frappe.db.commit()
+		if task_id:
+			# Surface the failure to the form (task_complete never fires on error)
+			frappe.publish_realtime(
+				f"task_error:{task_id}",
+				message={"error": "La generación del PDF falló. Revisa «Último error de generación»."},
+				user=frappe.session.user,
+			)
 		raise
 
 
@@ -78,7 +87,12 @@ def build(book_name: str, task_id: str | None = None, force: bool = False) -> di
 		frappe.throw(f"Wiki Book {book_name} spans {len(docs)} documents (max {MAX_DOCS})")
 
 	content_hash = compute_content_hash(book, docs)
-	if not force and content_hash == book.content_hash and book.last_built_file:
+	# The cached File's is_private is not covered by the content hash, so a
+	# space whose guest-readability flipped since the last build would keep
+	# serving (or wrongly hide) its book. Only short-circuit when BOTH the
+	# content hash AND the file privacy already match; otherwise rebuild so
+	# _save_book_file re-places the file in the correct public/private folder.
+	if not force and content_hash == book.content_hash and book.last_built_file and not _book_file_privacy_drifted(book):
 		progress(100, "Sin cambios")
 		return {"file_url": book.last_built_file, "unchanged": True}
 
@@ -118,6 +132,40 @@ def _space_is_guest_readable(space: str) -> bool:
 	from wiki.permissions import can_read_space
 
 	return bool(can_read_space(space, "Guest"))
+
+
+def _book_file_privacy_drifted(book) -> bool:
+	"""True when the cached File's is_private disagrees with what the space's
+	current guest-readability implies."""
+	should_be_public = bool(book.public_download) and _space_is_guest_readable(book.space)
+	for f in frappe.get_all(
+		"File",
+		filters={"attached_to_doctype": "Wiki Book", "attached_to_name": book.name},
+		fields=["is_private"],
+	):
+		if bool(f.is_private) == should_be_public:  # public↔private mismatch
+			return True
+	return False
+
+
+def reprivatize_books_for_space(doc, method=None) -> None:
+	"""doc_events on Wiki Space: guest-readability may have changed. For any
+	book whose cached file now sits in the wrong folder, delete the stale
+	file immediately (closes a public hole at once) and enqueue a rebuild to
+	regenerate it with correct privacy."""
+	space = doc.name if hasattr(doc, "name") else doc
+	for book_name in frappe.get_all("Wiki Book", filters={"space": space}, pluck="name"):
+		book = frappe.get_doc("Wiki Book", book_name)
+		if not book.last_built_file or not _book_file_privacy_drifted(book):
+			continue
+		for old in frappe.get_all(
+			"File",
+			filters={"attached_to_doctype": "Wiki Book", "attached_to_name": book.name},
+			pluck="name",
+		):
+			frappe.delete_doc("File", old, ignore_permissions=True, force=True)
+		book.db_set({"last_built_file": "", "content_hash": ""})
+		enqueue_build(book.name)
 
 
 def _save_book_file(book, pdf_bytes: bytes) -> str:

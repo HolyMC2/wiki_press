@@ -34,14 +34,22 @@ def render_tag_chips(tags: list[str]) -> str:
 
 
 def reindex_on_tag_change(doc, method=None):
-	"""doc_events: keep the search index in step when tags change via Desk."""
-	try:
-		from wiki.frappe_wiki.doctype.wiki_document.wiki_sqlite_search import enqueue_reindex
+	"""doc_events: reindex a Wiki Document when its tags change via Desk.
 
-		if doc.has_value_changed("wiki_tags") or doc.get("wiki_tags"):
-			enqueue_reindex([doc.name])
+	A tags-only edit changes no upstream-indexed field, so frappe's own
+	update_doc_index skips it. We reindex directly through the (patched)
+	upstream class, whose prepare_document now carries tag text. Best-effort:
+	never block a save. NB: enqueue_reindex/add_to_queue was removed upstream
+	— call index_doc directly.
+	"""
+	if not doc.has_value_changed("wiki_tags"):
+		return
+	try:
+		from wiki.frappe_wiki.doctype.wiki_document.wiki_sqlite_search import WikiSQLiteSearch
+
+		WikiSQLiteSearch().index_doc("Wiki Document", doc.name)
 	except Exception:
-		pass  # search freshness is best-effort; never block a save
+		frappe.log_error(title="wiki_press: tag reindex failed")
 
 
 MAX_TAGGED_ROWS = 2000

@@ -133,7 +133,15 @@ def ensure_work_clone(remote_url: str, branch: str, cache_key: str) -> str:
 	fetch = _run([*_auth_args(remote_url), "fetch", "-q", "origin", "--", branch], cwd=path)
 	if fetch.returncode == 0:
 		run_git(["checkout", "-q", "-B", branch, f"refs/remotes/origin/{branch}"], cwd=path)
-	# fetch failure = empty remote/new branch: keep the fresh local branch
+	else:
+		# A missing ref means the branch/remote is genuinely empty (fine — the
+		# first publish creates it). Any OTHER fetch error (network, auth,
+		# transport) must raise: silently keeping a stale checkout and
+		# reporting success would sync wrong/old content.
+		stderr = _redact(fetch.stderr or "")
+		ref_absent = "couldn't find remote ref" in stderr or "Repository is empty" in stderr
+		if not ref_absent and stderr.strip():
+			frappe.throw(f"git fetch failed: {stderr[:500]}")
 	return path
 
 

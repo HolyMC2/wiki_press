@@ -24,6 +24,8 @@ doc_events = {
     "Wiki Change Request": {"on_update": "wiki_press.events.on_change_request_update"},
     # Tags are edited via Desk (custom field) — keep the search index fresh.
     "Wiki Document": {"on_update": "wiki_press.tags.reindex_on_tag_change"},
+    # Space role change may flip guest-readability -> re-privatize book files.
+    "Wiki Space": {"on_update": "wiki_press.builder.reprivatize_books_for_space"},
 }
 
 # Additional search class sharing upstream's index file: builds after
