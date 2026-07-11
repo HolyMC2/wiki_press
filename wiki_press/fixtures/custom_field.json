@@ -1,0 +1,12 @@
+[
+ {
+  "doctype": "Custom Field",
+  "name": "Wiki Document-wiki_tags",
+  "dt": "Wiki Document",
+  "fieldname": "wiki_tags",
+  "fieldtype": "Table MultiSelect",
+  "label": "Tags",
+  "options": "Wiki Document Tag",
+  "insert_after": "is_published"
+ }
+]

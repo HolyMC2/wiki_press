@@ -20,4 +20,15 @@ class WikiDocumentCanonical(WikiDocument):
 		base = frappe.conf.get("wiki_canonical_base")
 		if base and self.route:
 			context["canonical_url"] = f"{base.rstrip('/')}/{self.route}"
+
+		# Tag chips above the content. Injected here instead of a template
+		# override so upstream template updates never conflict.
+		from wiki_press.tags import get_document_tags, render_tag_chips
+
+		tags = get_document_tags(self.name)
+		if tags:
+			context["wiki_press_tags"] = tags
+			context["rendered_content"] = render_tag_chips(tags) + (
+				context.get("rendered_content") or ""
+			)
 		return context

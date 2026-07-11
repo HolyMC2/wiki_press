@@ -104,6 +104,25 @@ class TestWikiBook(FrappeTestCase):
 		# unknown key on a type without wildcard -> None (no site_config base in tests)
 		self.assertIsNone(get_help_url("Storefront Page", f"missing-{suffix}"))
 
+	def test_tags_roundtrip_and_visibility(self):
+		suffix = frappe.generate_hash(length=8)
+		tag = f"tag-{suffix}"
+		frappe.get_doc({"doctype": "Wiki Tag", "tag_name": tag}).insert()
+		page = frappe.db.get_value(
+			"Wiki Document", {"route": ["like", f"rt-src-%{self.space.route.split('-')[-1]}%"]}, "name"
+		) or frappe.db.get_value("Wiki Document", {"is_group": 0, "is_published": 1}, "name")
+		doc = frappe.get_doc("Wiki Document", page)
+		doc.append("wiki_tags", {"tag": tag})
+		doc.flags.ignore_permissions = True
+		doc.save()
+
+		from wiki_press.tags import get_document_tags, render_tag_chips
+
+		self.assertIn(tag, get_document_tags(doc.name))
+		chips = render_tag_chips([tag])
+		self.assertIn("wiki-tag-chip", chips)
+		self.assertIn(tag, chips)
+
 	def test_content_hash_changes_with_settings(self):
 		docs = walk_space_tree(self.space.name)
 		h1 = compute_content_hash(self.book, docs)

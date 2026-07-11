@@ -12,14 +12,24 @@ required_apps = ["wiki"]
 
 app_include_js = ["/assets/wiki_press/js/wiki_press_help.js"]
 
-fixtures = [{"dt": "Wiki Help Mapping"}]
+fixtures = [
+    {"dt": "Wiki Help Mapping"},
+    {"dt": "Custom Field", "filters": [["name", "in", ["Wiki Document-wiki_tags"]]]},
+]
 
 doc_events = {
     # On CR merge: rebuild watching books + publish to configured git repos.
     # Both enqueues are deduplicated by job_id, so a burst of merges costs
     # one build / one push.
     "Wiki Change Request": {"on_update": "wiki_press.events.on_change_request_update"},
+    # Tags are edited via Desk (custom field) — keep the search index fresh.
+    "Wiki Document": {"on_update": "wiki_press.tags.reindex_on_tag_change"},
 }
+
+# Additional search class sharing upstream's index file: builds after
+# upstream (install order) so the final index includes tag names; the wiki
+# SPA's query path is untouched.
+sqlite_search = ["wiki_press.search.WikiPressSearch"]
 
 scheduler_events = {
     "cron": {

@@ -1,0 +1,28 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<div style="max-width:720px;margin:0 auto;padding:24px 16px">
+  <h1 style="font-size:24px;margin-bottom:4px">Etiquetas</h1>
+  {% if tag_filter %}
+  <p style="color:#57606a"><a href="/etiquetas">← todas las etiquetas</a></p>
+  {% endif %}
+
+  {% if not tag_map %}
+  <p style="color:#57606a">No hay páginas etiquetadas{% if tag_filter %} con «{{ tag_filter }}»{% endif %}.</p>
+  {% endif %}
+
+  {% for tag, pages in tag_map | dictsort %}
+  <section style="margin:20px 0">
+    <h2 style="font-size:16px;margin-bottom:8px">
+      <a href="/etiquetas?tag={{ tag | urlencode }}" style="text-decoration:none">{{ tag }}</a>
+      <span style="color:#8b949e;font-weight:normal">({{ pages | length }})</span>
+    </h2>
+    <ul style="list-style:none;padding:0;margin:0">
+      {% for page in pages %}
+      <li style="padding:3px 0"><a href="/{{ page.route }}">{{ page.title }}</a></li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}
