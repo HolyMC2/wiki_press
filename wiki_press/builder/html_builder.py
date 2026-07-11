@@ -96,6 +96,42 @@ def _rewrite_local_images(html: str) -> str:
 	return LOCAL_SRC_RE.sub(replace, html)
 
 
+SRC_RE = re.compile(r'\bsrc="([^"]+)"')
+
+
+def _rewrite_remote_assets(html: str) -> str:
+	"""Central manual-asset URLs (R2 public CDN / role-gated tech ref) are
+	downloaded to a temp file and rewritten to file:// so the hardened
+	WeasyPrint fetcher (which denies every network scheme) still embeds them.
+	Anything that isn't a manual asset is left for _rewrite_local_images."""
+	from wiki_press import assets
+
+	cache: dict[str, str] = {}
+	state: dict[str, str | None] = {"tmpdir": None}
+
+	def replace(m: re.Match) -> str:
+		url = m.group(1)
+		if not assets.is_manual_asset_url(url):
+			return m.group(0)
+		if url in cache:
+			return f'src="file://{cache[url]}"'
+		data = assets.fetch_asset_bytes(url)
+		if not data:
+			return 'src=""'
+		import hashlib
+		import tempfile
+
+		if state["tmpdir"] is None:
+			state["tmpdir"] = tempfile.mkdtemp(prefix="wikibook-assets-")
+		path = os.path.join(state["tmpdir"], hashlib.sha256(url.encode()).hexdigest()[:32])
+		with open(path, "wb") as fh:
+			fh.write(data)
+		cache[url] = path
+		return f'src="file://{path}"'
+
+	return SRC_RE.sub(replace, html)
+
+
 def _cover_html(book, strings: dict) -> str:
 	cover_img = ""
 	if book.cover_image:
@@ -155,5 +191,6 @@ def assemble_book_html(book, docs: list[dict]) -> str:
 		html += _toc_html(docs, book.toc_depth or 3, strings)
 	html += "".join(sections)
 	html = _rewrite_internal_links(html, route_map)
+	html = _rewrite_remote_assets(html)
 	html = _rewrite_local_images(html)
 	return html
