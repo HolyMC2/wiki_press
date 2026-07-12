@@ -188,13 +188,34 @@ def _route_space(route: str) -> str | None:
     return None
 
 
+def _doc_space(doc) -> str | None:
+    """Which manual space a page belongs to. Prefers doc.route, but on INSERT
+    the wiki hasn't generated the route yet at before_save time, so fall back to
+    walking parent_wiki_document up to the root group and matching the Wiki
+    Space that owns it."""
+    space = _route_space(doc.route or "")
+    if space:
+        return space
+    node = doc.parent_wiki_document
+    guard = 0
+    while node and guard < 50:
+        parent = frappe.db.get_value("Wiki Document", node, "parent_wiki_document")
+        if not parent:
+            break
+        node, guard = parent, guard + 1
+    if not node:
+        return None
+    route = frappe.db.get_value("Wiki Space", {"root_group": node}, "route")
+    return route if route in ("manual", "manual-tecnico") else None
+
+
 def rewrite_document_images(doc) -> bool:
     """Reroute local image refs in a manual/manual-tecnico page to R2. Returns
     True if the content changed. No-op unless R2 is configured and the page is
     in one of the two manual spaces."""
     if not is_configured():
         return False
-    space = _route_space(doc.route or "")
+    space = _doc_space(doc)
     if not space:
         return False
     is_tech = space == "manual-tecnico"
