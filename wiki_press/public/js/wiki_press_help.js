@@ -1,6 +1,11 @@
-// «Manual» entry in the Desk Help menu → contextual manual page.
-// Resolution lives server-side (wiki_press.api.get_help_url); this only asks
-// for the current doctype (form/list view) and opens the result.
+// «Manual» launcher on the Desk → contextual manual page. Resolution lives
+// server-side (wiki_press.api.get_help_url); this only asks for the current
+// doctype (form/list view) and opens the result.
+//
+// Frappe v16 retired the top navbar's `.dropdown-help` menu (collapsing
+// `body-sidebar` now — labels clipped at 50px), so the old menu injection
+// silently no-op'd. Mount a dedicated always-visible launcher on <body>
+// instead, sharing one fixed container with doco's «Ayuda» launcher.
 (function () {
 	function currentContext() {
 		const route = frappe.get_route ? frappe.get_route() : [];
@@ -24,20 +29,51 @@
 		});
 	}
 
-	$(document).on("toolbar_setup", function () {
+	function esc(s) {
+		if (window.frappe && frappe.utils && frappe.utils.escape_html)
+			return frappe.utils.escape_html(s || "");
+		return String(s || "").replace(/[&<>"]/g, (c) =>
+			({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+	}
+
+	function launcherContainer() {
+		let container = document.getElementById("muelle-help-launchers");
+		if (!container) {
+			container = document.createElement("div");
+			container.id = "muelle-help-launchers";
+			container.style.cssText =
+				"position:fixed;right:16px;bottom:16px;z-index:1030;" +
+				"display:flex;flex-direction:column-reverse;gap:8px;";
+			document.body.appendChild(container);
+		}
+		return container;
+	}
+
+	function mountLauncher() {
 		try {
-			const $menu = $(".dropdown-help ul.dropdown-menu");
-			if (!$menu.length || $menu.find(".wiki-press-help").length) return;
-			$menu.prepend(
-				`<li class="wiki-press-help"><a class="dropdown-item" href="#">${__("Manual")}</a></li>`
-			);
-			$menu.find(".wiki-press-help a").on("click", (e) => {
+			if (!window.frappe || !frappe.ui || typeof __ !== "function") return;
+			const container = launcherContainer();
+			if (container.querySelector(".wiki-press-manual-launcher")) return; // idempotent
+			const btn = document.createElement("button");
+			btn.type = "button";
+			btn.className = "btn btn-default btn-sm wiki-press-manual-launcher";
+			btn.style.cssText =
+				"box-shadow:var(--shadow-md,0 2px 8px rgba(0,0,0,.15));" +
+				"border-radius:20px;display:flex;align-items:center;gap:6px;";
+			btn.setAttribute("aria-label", __("Manual"));
+			btn.innerHTML =
+				'<span aria-hidden="true">📖</span><span>' + esc(__("Manual")) + "</span>";
+			btn.addEventListener("click", (e) => {
 				e.preventDefault();
 				openManual();
 			});
+			container.appendChild(btn);
 		} catch (e) {
-			// Navbar markup drift must never break the Desk
-			console.warn("wiki_press help menu injection skipped", e);
+			// A launcher must never break the Desk
+			console.warn("wiki_press manual launcher mount skipped", e);
 		}
-	});
+	}
+
+	$(document).on("toolbar_setup", mountLauncher);
+	$(mountLauncher);
 })();
