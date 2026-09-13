@@ -1,0 +1,84 @@
+# wiki_press CI.
+#
+# Until 2026-09-12 this repo had no CI at all (logging audit G18: nine repos
+# with none). wiki_press is the companion app for Frappe Wiki — whole-book PDF
+# export, git publish, canonical SEO, contextual help — and it shells out to git
+# against remotes taken from a DocType field, so its validators are a security
+# surface, not a nicety.
+#
+# The scope is deliberately small and honest, and there is NO test step. All
+# seven test files are FrappeTestCase subclasses that create wiki pages and
+# spaces; stubbing `frappe.tests.utils.FrappeTestCase` down to
+# `unittest.TestCase` was measured on 2026-09-12 and leaves most of them failing
+# on real document work. `test_security.py` gets closest — 5 of 7 pass — but
+# shipping a 5-of-7 file as a green gate would be a gate that lies. So this one
+# claims only what it proves:
+#
+#   1. ruff restricted to the classes that are always bugs — syntax errors,
+#      undefined names, f-string and assert mistakes. This selection is the one
+#      that earned its place: it is how `posawesome.set_batch_nos_for_bundels`
+#      and `get_language_info._validate_language_code` were caught this week,
+#      both live NameErrors no test had reached.
+#   2. `compileall`, so a file that ruff parses but CPython 3.14 refuses cannot
+#      reach a bench.
+#
+# Lifting the git-remote validators (`validate_ref`, `validate_remote_url`,
+# `validate_subdir`) out of the FrappeTestCase file into a plain unittest module
+# would make the security half of this suite runnable here. That is a refactor,
+# not a workflow change.
+#
+# The suite stays where it can be true — on the lab:
+#
+#   cd ~/muelle-host/muelle
+#   docker compose exec -T backend bench \
+#       --site doco-mirror.lab.xoloitzcuintles.com run-tests --app wiki_press
+#
+# weasyprint is NOT installed here. It is a real runtime dependency of the book
+# exporter, but it needs pango/cairo native libs (which the bench image ships and
+# a bare runner does not) and nothing in this gate imports it.
+#
+# No `paths:` filter on purpose — a required check that a path filter skips
+# reports nothing and blocks the merge forever.
+
+name: tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: ruff gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # The bench runs 3.14.2 (verified in the backend container 2026-09-12);
+      # CI must not pass on an interpreter production never executes.
+      # No `cache: pip` — ruff is not in pyproject.toml, so a hash-keyed cache
+      # would save nothing and add a way for the job to fail.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      # Pinned: an unpinned ruff adds rules on its own schedule and turns this
+      # gate red without a commit.
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff==0.14.14
+
+      - name: Ruff — syntax and undefined names
+        run: python -m ruff check --select E9,F63,F7,F82,F821 wiki_press
+
+      - name: Byte-compile the app
+        run: python -m compileall -q wiki_press
