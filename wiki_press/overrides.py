@@ -21,6 +21,14 @@ class WikiDocumentCanonical(WikiDocument):
 		if base and self.route:
 			context["canonical_url"] = f"{base.rstrip('/')}/{self.route}"
 
+		# Upstream lists every show_in_switcher space regardless of read access,
+		# so guests on the public manual got links to staff spaces that 404.
+		spaces = context.get("wiki_spaces_for_switcher")
+		if spaces:
+			from wiki.permissions import can_read_space
+
+			context["wiki_spaces_for_switcher"] = [s for s in spaces if can_read_space(s.name)]
+
 		# Tag chips above the content. Injected here instead of a template
 		# override so upstream template updates never conflict.
 		from wiki_press.tags import get_document_tags, render_tag_chips

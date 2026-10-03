@@ -121,3 +121,34 @@ class TestPublicManualAccess(FrappeTestCase):
         titles = {d["title"] for d in walk_space_tree(space.name)}
         self.assertIn("Pública", titles)
         self.assertNotIn("Secreta", titles)
+
+
+class TestSpaceSwitcherAccess(FrappeTestCase):
+    """The space switcher only lists spaces the viewer can read, so guests on
+    the public manual never get links to staff spaces that answer 404."""
+
+    def setUp(self):
+        frappe.set_user("Administrator")
+        self.suffix = frappe.generate_hash(length=8)
+
+    def test_guest_switcher_hides_unreadable_spaces(self):
+        public = _published_space(self.suffix, "pm-sw-pub", {"Página": "# x\n"}, guest_read=True)
+        staff = _published_space(self.suffix, "pm-sw-staff", {"Página": "# x\n"})
+        for space in (public, staff):
+            space.db_set("show_in_switcher", 1)
+        doc = _first_leaf(public)
+        frappe.set_user("Guest")
+        try:
+            names = {s.name for s in doc.get_web_context()["wiki_spaces_for_switcher"]}
+        finally:
+            frappe.set_user("Administrator")
+        self.assertIn(public.name, names)
+        self.assertNotIn(staff.name, names)
+
+    def test_manager_switcher_keeps_every_space(self):
+        public = _published_space(self.suffix, "pm-sw-pub2", {"Página": "# x\n"}, guest_read=True)
+        staff = _published_space(self.suffix, "pm-sw-staff2", {"Página": "# x\n"})
+        staff.db_set("show_in_switcher", 1)
+        doc = _first_leaf(public)
+        names = {s.name for s in doc.get_web_context()["wiki_spaces_for_switcher"]}
+        self.assertIn(staff.name, names)
