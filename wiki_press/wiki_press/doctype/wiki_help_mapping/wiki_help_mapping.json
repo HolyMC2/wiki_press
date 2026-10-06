@@ -21,7 +21,7 @@
    "reqd": 1
   },
   {
-   "description": "Exact key (e.g. Sales Invoice). Use * as per-type fallback.",
+   "description": "Exact name (e.g. Sales Invoice). Use * for every screen of that type.",
    "fieldname": "context_key",
    "fieldtype": "Data",
    "in_list_view": 1,

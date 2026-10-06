@@ -38,7 +38,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Plain URL, no credentials. https pulls take the token from site_config wiki_press_git_token.",
+   "description": "Plain address, no password in it. Muelle sets the access key on the server.",
    "fieldname": "remote_url",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -75,6 +75,7 @@
   },
   {
    "fieldname": "last_synced_sha",
+   "hidden": 1,
    "fieldtype": "Data",
    "label": "Last Synced SHA",
    "read_only": 1

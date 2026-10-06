@@ -70,5 +70,245 @@
   "context_key": "*",
   "wiki_route": "manual",
   "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00010",
+  "context_type": "DocType",
+  "context_key": "Mercado Settings",
+  "wiki_route": "manual/administración-y-configuración/ajustes-de-mercado",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00011",
+  "context_type": "DocType",
+  "context_key": "Credit Provider",
+  "wiki_route": "manual/clientes-cobranza-y-crédito/liquidaciones-con-la-financiera",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00012",
+  "context_type": "DocType",
+  "context_key": "Provider Settlement Run",
+  "wiki_route": "manual/clientes-cobranza-y-crédito/liquidaciones-con-la-financiera",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00013",
+  "context_type": "DocType",
+  "context_key": "Saldo Settings",
+  "wiki_route": "manual/recargas-y-servicios/catálogo-y-saldo-de-la-bolsa",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00014",
+  "context_type": "DocType",
+  "context_key": "Saldo Product",
+  "wiki_route": "manual/recargas-y-servicios/catálogo-y-saldo-de-la-bolsa",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00015",
+  "context_type": "DocType",
+  "context_key": "Saldo Transaction",
+  "wiki_route": "manual/recargas-y-servicios/cuando-una-recarga-falla",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00016",
+  "context_type": "DocType",
+  "context_key": "WhatsApp Message",
+  "wiki_route": "manual/bandeja-y-whatsapp/responder-por-whatsapp",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00017",
+  "context_type": "DocType",
+  "context_key": "WhatsApp Templates",
+  "wiki_route": "manual/bandeja-y-whatsapp/plantillas-de-whatsapp-y-la-cola-de-revisión",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00018",
+  "context_type": "DocType",
+  "context_key": "MercadoPago Settings",
+  "wiki_route": "manual/punto-de-venta/cobrar-con-la-terminal-mercadopago-point",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00019",
+  "context_type": "DocType",
+  "context_key": "MercadoPago Order",
+  "wiki_route": "manual/punto-de-venta/cobrar-con-la-terminal-mercadopago-point",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00020",
+  "context_type": "DocType",
+  "context_key": "MercadoPago Payment",
+  "wiki_route": "manual/punto-de-venta/cobrar-con-la-terminal-mercadopago-point",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00021",
+  "context_type": "DocType",
+  "context_key": "Conekta Settings",
+  "wiki_route": "manual/tienda-en-línea/pagos-en-línea-cómo-se-confirman-y-qué-hacer-si-uno-queda-pendiente",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00022",
+  "context_type": "DocType",
+  "context_key": "Conekta Order",
+  "wiki_route": "manual/tienda-en-línea/pagos-en-línea-cómo-se-confirman-y-qué-hacer-si-uno-queda-pendiente",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00023",
+  "context_type": "DocType",
+  "context_key": "Conekta Payment Link",
+  "wiki_route": "manual/tienda-en-línea/pagos-en-línea-cómo-se-confirman-y-qué-hacer-si-uno-queda-pendiente",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00024",
+  "context_type": "DocType",
+  "context_key": "Envia Shipment",
+  "wiki_route": "manual/tienda-en-línea/generar-la-guía-de-envío-y-dar-seguimiento",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00025",
+  "context_type": "Desk Page",
+  "context_key": "abordo-wizard",
+  "wiki_route": "manual/primeros-pasos/tu-tienda-y-tu-rol",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00026",
+  "context_type": "DocType",
+  "context_key": "CRM Campaign",
+  "wiki_route": "manual/marketing-campañas-y-redes/campañas-de-marketing",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00027",
+  "context_type": "DocType",
+  "context_key": "Marketing Audience",
+  "wiki_route": "manual/marketing-campañas-y-redes/audiencias-segmentos-de-clientes-para-difusiones-y-campañas",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00028",
+  "context_type": "DocType",
+  "context_key": "Marketing Broadcast",
+  "wiki_route": "manual/marketing-campañas-y-redes/audiencias-segmentos-de-clientes-para-difusiones-y-campañas",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00029",
+  "context_type": "DocType",
+  "context_key": "Chatflow",
+  "wiki_route": "manual/marketing-campañas-y-redes/automatizaciones-por-palabra-clave-chatflow-respuestas-automáticas",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00030",
+  "context_type": "DocType",
+  "context_key": "Lead Scoring Rule",
+  "wiki_route": "manual/marketing-campañas-y-redes/puntaje-de-prospectos-y-auto-asignación-reparto-de-prospectos",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00031",
+  "context_type": "DocType",
+  "context_key": "Social Post",
+  "wiki_route": "manual/marketing-campañas-y-redes/publicar-en-redes-sociales-crear-aprobar-y-programar-publicaciones-de-fb-ig",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00032",
+  "context_type": "DocType",
+  "context_key": "WhatsApp Send Review",
+  "wiki_route": "manual/bandeja-y-whatsapp/plantillas-de-whatsapp-y-la-cola-de-revisión",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00033",
+  "context_type": "DocType",
+  "context_key": "Repair Order",
+  "wiki_route": "manual/reparaciones-en-mostrador/recibir-un-equipo-a-reparación",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00034",
+  "context_type": "DocType",
+  "context_key": "Repair Signature",
+  "wiki_route": "manual/reparaciones-en-mostrador/recibir-un-equipo-a-reparación",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00035",
+  "context_type": "DocType",
+  "context_key": "Taller App Settings",
+  "wiki_route": "manual/reparaciones-en-mostrador/entregar-y-cobrar",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00036",
+  "context_type": "DocType",
+  "context_key": "CFDI Stamping Settings",
+  "wiki_route": "manual/facturación-cfdi/facturar-una-venta",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00037",
+  "context_type": "DocType",
+  "context_key": "CFDI Stamp Log",
+  "wiki_route": "manual/facturación-cfdi/errores-comunes-al-timbrar-y-cómo-resolverlos",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00038",
+  "context_type": "DocType",
+  "context_key": "Cancellation Reason",
+  "wiki_route": "manual/facturación-cfdi/cancelar-una-factura-cfdi",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00039",
+  "context_type": "Desk Page",
+  "context_key": "factura-global",
+  "wiki_route": "manual/facturación-cfdi/factura-global-ventas-al-público-en-general",
+  "enabled": 1
  }
 ]

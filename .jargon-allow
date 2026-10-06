@@ -1,0 +1,10 @@
+# whole files: tests, drills, patches, operator-only tools
+# Git publish/pull guards run in background jobs Muelle staff configure; no shop user sees them.
+wiki_press/git_publish.py
+wiki_press/git_pull.py
+wiki_press/git_repo.py
+# Startup guards that fire only when an upstream wiki update breaks this app (support reads them).
+wiki_press/search.py
+# one field of one DocType file
+# Manual administrators pick "DocType" as Frappe names it; the other options are translated in es.csv.
+wiki_press/wiki_press/doctype/wiki_help_mapping/wiki_help_mapping.json::context_type

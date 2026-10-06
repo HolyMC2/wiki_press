@@ -1,0 +1,5 @@
+Desk Page,Página
+POS Screen,Pantalla de caja
+Storefront Page,Página de la tienda
+Exact name (e.g. Sales Invoice). Use * for every screen of that type.,Nombre exacto (p. ej. Sales Invoice). * = para todas las pantallas de ese tipo.
+"Plain address, no password in it. Muelle sets the access key on the server.","Dirección simple, sin contraseña. Muelle configura la clave de acceso en el servidor."
