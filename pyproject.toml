@@ -9,7 +9,7 @@ dependencies = [
     # weasyprint is required for the book PDF exporter (P2). Declared here so
     # image bakes pick it up; pango/cairo native libs already ship in the
     # bench image (verified P0 2026-07-07).
-    "weasyprint~=68.0",
+    "weasyprint>=68.0",  # URLFetcher API; Frappe pins the exact version
     "pygments",
 ]
 

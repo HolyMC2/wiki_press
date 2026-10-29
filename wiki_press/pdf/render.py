@@ -82,32 +82,44 @@ def build_css(book) -> str:
 	return css
 
 
-def _hardened_url_fetcher(url: str):
+def _is_allowed_resource(url: str) -> bool:
 	"""Allow data: URIs and file:// paths under the site/assets roots. Deny
 	every network scheme — all legitimate references were rewritten to
 	file:// by the builder, so anything else is a bug or an injection."""
-	from weasyprint import default_url_fetcher
-
 	from wiki_press.builder.html_builder import resolve_local_file
 
 	if url.startswith("data:"):
-		return default_url_fetcher(url)
+		return True
 	if url.startswith("file://"):
 		import os
 		import urllib.parse
 
 		path = urllib.parse.unquote(url[len("file://") :])
 		site_rel = _to_site_relative(path)
-		if site_rel and resolve_local_file(site_rel) == os.path.realpath(path):
-			return default_url_fetcher(url)
-	# Disallowed (external / out-of-site) resource: return an empty stand-in
-	# instead of raising, so ONE bad reference can't abort the whole book
-	# build. Nothing is fetched — SSRF/local-file exfil stays blocked.
-	frappe.log_error(
-		message=f"wiki_press: blocked resource in book render: {url[:200]}",
-		title="Wiki Press book render",
-	)
-	return {"string": b"", "mime_type": "application/octet-stream"}
+		return bool(site_rel) and resolve_local_file(site_rel) == os.path.realpath(path)
+	return False
+
+
+def _hardened_url_fetcher():
+	"""A WeasyPrint URLFetcher (the only fetcher API WeasyPrint 69+ accepts) that
+	fetches allowed resources and answers everything else with an empty body."""
+	from weasyprint import URLFetcher
+	from weasyprint.urls import URLFetcherResponse
+
+	class HardenedURLFetcher(URLFetcher):
+		def fetch(self, url, headers=None):
+			if _is_allowed_resource(url):
+				return super().fetch(url, headers)
+			# Disallowed (external / out-of-site) resource: return an empty stand-in
+			# instead of raising, so ONE bad reference can't abort the whole book
+			# build. Nothing is fetched — SSRF/local-file exfil stays blocked.
+			frappe.log_error(
+				message=f"wiki_press: blocked resource in book render: {url[:200]}",
+				title="Wiki Press book render",
+			)
+			return URLFetcherResponse(url, body=b"", headers={"Content-Type": "application/octet-stream"})
+
+	return HardenedURLFetcher(allowed_protocols={"data", "file"}, allow_redirects=False)
 
 
 def _to_site_relative(path: str) -> str | None:
@@ -136,5 +148,5 @@ def render_book_pdf(body_html: str, book) -> bytes:
 		f"<title>{frappe.utils.escape_html(book.title)}</title></head>"
 		f"<body>{body_html}</body></html>"
 	)
-	html = HTML(string=document, url_fetcher=_hardened_url_fetcher, base_url=None)
+	html = HTML(string=document, url_fetcher=_hardened_url_fetcher(), base_url=None)
 	return html.write_pdf(stylesheets=[CSS(string=build_css(book))])
