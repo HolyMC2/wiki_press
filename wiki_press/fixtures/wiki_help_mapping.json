@@ -310,5 +310,45 @@
   "context_key": "factura-global",
   "wiki_route": "manual/facturación-cfdi/factura-global-ventas-al-público-en-general",
   "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00040",
+  "context_type": "DocType",
+  "context_key": "Pricing Rule",
+  "wiki_route": "manual/promociones-y-descuentos/que-promocion-quieres-dar",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00041",
+  "context_type": "DocType",
+  "context_key": "Promotional Scheme",
+  "wiki_route": "manual/promociones-y-descuentos/precio-de-mayoreo-por-escalas",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00042",
+  "context_type": "DocType",
+  "context_key": "POS Offer",
+  "wiki_route": "manual/promociones-y-descuentos/que-promocion-quieres-dar",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00043",
+  "context_type": "DocType",
+  "context_key": "POS Coupon",
+  "wiki_route": "manual/promociones-y-descuentos/cupon-para-redes-o-whatsapp",
+  "enabled": 1
+ },
+ {
+  "doctype": "Wiki Help Mapping",
+  "name": "WHM-00044",
+  "context_type": "DocType",
+  "context_key": "Coupon Code",
+  "wiki_route": "manual/promociones-y-descuentos/cupon-para-redes-o-whatsapp",
+  "enabled": 1
  }
 ]
