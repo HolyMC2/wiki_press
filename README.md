@@ -33,6 +33,15 @@ hash-gated. Failures land in *Last Build Error* on the form.
 URL, branch, subdir). On each tenant, create the space (roles included) and a
 *Wiki Pull Source* pointing at the same repo/subdir; the `*/30` cron pulls, or
 call `wiki_press.git_pull.pull_source`. A space cannot be both target and source.
+A `file://` remote is a path on the tenant's own bench, so a site that moves to
+another cell needs a hub it can reach there.
+
+A pull that fails (remote gone or unreachable, wipe guard) is recorded on the
+source (*Last Status*, *Last Error*, *Consecutive Failures*) and the cron skips
+it until *Next Attempt After*: 30 min after the first failure, doubling up to a
+day. *Sincronizar ahora* always tries. A full pull, re-enabling the source, or
+a change to its remote, branch or subdir clears the wait. The Error Log gets one row when a failure
+streak starts or its error changes, then at most one a day.
 
 **Credentials** — never in doctypes. https remotes read
 `wiki_press_git_token` from site_config; `file://` and ssh remotes need none.
