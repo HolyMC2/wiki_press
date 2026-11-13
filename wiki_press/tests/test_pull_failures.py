@@ -201,3 +201,71 @@ class TestPullFailureBackoff(HubFixture, FrappeTestCase):
 		self.assertEqual(state.last_status, "Error")
 		self.assertEqual(state.consecutive_failures, 2)
 		self.assertEqual(self._error_logs(source.name) - logs_before, 1)
+
+	def test_timings_in_the_error_do_not_count_as_a_new_error(self):
+		mirror = _make_space(f"t{self.suffix}", "pf-ms", {})
+		source = self._source(mirror.name, os.path.join(self.tmp, "slow.git"))
+		logs_before = self._error_logs(source.name)
+
+		for ms in (133042, 129871, 7):
+			error = frappe.ValidationError(
+				f"git fetch failed: fatal: unable to access 'https://hub.invalid/x.git/': "
+				f"Failed to connect to hub.invalid port 443 after {ms} ms: Could not connect to server"
+			)
+			with patch("wiki_press.git_pull.ensure_work_clone", side_effect=error):
+				self.assertEqual(pull_source(source.name)["reason"], "fetch-failed")
+		state = self._state(source.name)
+		self.assertEqual(state.consecutive_failures, 3)
+		self.assertIn("after 7 ms", state.last_error)
+		self.assertEqual(self._error_logs(source.name) - logs_before, 1)
+
+	def test_a_space_sync_that_ends_in_error_backs_off(self):
+		"""upstream sync_space swallows its own errors and only marks the space;
+		the pull must not count that as a full pull."""
+		import wiki.wiki.git_sync as git_sync
+
+		self._publish_into(self.hub, f"e{self.suffix}", {"Uno": "# Uno\n\nhola.\n"})
+		mirror = _make_space(f"em{self.suffix}", "pf-serr", {})
+		source = self._source(mirror.name, self.hub)
+		logs_before = self._error_logs(source.name)
+
+		def failing_sync(space_name, token=None, trigger="Manual"):
+			git_sync._record_error(space_name, "Traceback ...\nfrappe.exceptions.ValidationError: route clash")
+
+		with patch.object(git_sync, "sync_space", side_effect=failing_sync):
+			for _ in range(2):
+				result = pull_source(source.name)
+				self.assertFalse(result["synced"])
+				self.assertEqual(result["reason"], "sync-failed")
+				self.assertEqual(result["space_status"], "Error")
+		state = self._state(source.name)
+		self.assertEqual(state.last_status, "Error")
+		self.assertIn("route clash", state.last_error)
+		self.assertEqual(state.consecutive_failures, 2)
+		self.assertGreater(get_datetime(state.next_attempt_after), add_to_date(now_datetime(), minutes=55))
+		self.assertFalse(frappe.db.get_value("Wiki Pull Source", source.name, "last_synced_sha"))
+		self.assertEqual(self._error_logs(source.name) - logs_before, 1)
+
+		# The real sync then works and clears the streak.
+		self.assertTrue(pull_source(source.name)["synced"])
+		state = self._state(source.name)
+		self.assertEqual(state.last_status, "Success")
+		self.assertEqual(state.consecutive_failures, 0)
+		self.assertIsNone(state.next_attempt_after)
+
+	def test_an_error_before_the_space_sync_is_recorded_not_raised(self):
+		self._publish_into(self.hub, f"x{self.suffix}", {"Uno": "# Uno\n\nhola.\n"})
+		mirror = _make_space(f"xm{self.suffix}", "pf-raise", {})
+		source = self._source(mirror.name, self.hub)
+		logs_before = self._error_logs(source.name)
+
+		boom = frappe.ValidationError("wiki_press: git_sync._fetch_tree changed (rebase break)")
+		with patch("wiki_press.git_pull.assert_transport_contract", side_effect=boom):
+			result = pull_source(source.name)
+		self.assertFalse(result["synced"])
+		self.assertEqual(result["reason"], "sync-failed")
+		state = self._state(source.name)
+		self.assertEqual(state.last_status, "Error")
+		self.assertIn("rebase break", state.last_error)
+		self.assertEqual(state.consecutive_failures, 1)
+		self.assertEqual(self._error_logs(source.name) - logs_before, 1)

@@ -10,6 +10,7 @@ Why: works with ANY remote (no per-site GitHub App), no secrets sprawl, and
 every reconciliation/read-only/logging behavior stays upstream's.
 """
 
+import re
 import subprocess
 from contextlib import contextmanager
 
@@ -55,10 +56,17 @@ def _failure_text(exc: BaseException) -> str:
 	return _redact(text)[:ERROR_TEXT_LIMIT]
 
 
+def _error_key(error: str | None) -> str:
+	"""The part of an error that says what failed. git's network errors carry
+	a timing ("after 133042 ms") and tracebacks carry line numbers, so digit
+	runs do not count as a change."""
+	return re.sub(r"\d+", "N", error or "")
+
+
 def _should_log(source, error: str) -> bool:
 	"""One Error Log when a failure streak starts or its error text changes,
 	then at most one every RELOG_AFTER_HOURS while it repeats."""
-	if not cint(source.consecutive_failures) or (source.last_error or "") != error:
+	if not cint(source.consecutive_failures) or _error_key(source.last_error) != _error_key(error):
 		return True
 	last_logged = frappe.db.get_value(
 		"Error Log",
@@ -220,16 +228,29 @@ def pull_source(source_name: str) -> dict:
 		with _local_transport(clone) as git_sync:
 			git_sync.sync_space(source.space, trigger="Manual")
 	except Exception:
-		err = frappe.get_traceback(with_context=False)[-1000:]
-		source.db_set({"last_status": "Error", "last_error": err})
-		raise
+		# Raised outside upstream's own try (space config, transport contract):
+		# recorded and backed off like a failed fetch.
+		error = _redact(frappe.get_traceback(with_context=False))[-ERROR_TEXT_LIMIT:]
+		failure = _record_failure(source, error, title="wiki_press: pull sync failed")
+		return {"synced": False, "reason": "sync-failed", "detail": error, **failure}
 
-	status = frappe.db.get_value("Wiki Space", source.space, "last_sync_status")
+	# upstream sync_space catches its own errors: it logs them, sets the space's
+	# last_sync_status «Error» and returns. Only «Success» (also written for an
+	# unchanged head) is a full pull.
+	status, sync_error = frappe.db.get_value(
+		"Wiki Space", source.space, ["last_sync_status", "last_sync_error"]
+	)
+	if status != "Success":
+		error = _redact(sync_error or f"space sync ended with status {status or '(none)'}")
+		error = error[-ERROR_TEXT_LIMIT:]
+		failure = _record_failure(source, error, title="wiki_press: pull sync failed")
+		return {"synced": False, "reason": "sync-failed", "space_status": status, "detail": error, **failure}
+
 	source.db_set(
 		{
 			"last_synced_sha": sha,
 			"last_synced_on": frappe.utils.now(),
-			"last_status": status or "Success",
+			"last_status": "Success",
 			"last_error": "",
 			"consecutive_failures": 0,
 			"next_attempt_after": None,
