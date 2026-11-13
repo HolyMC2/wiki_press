@@ -64,7 +64,7 @@ Phone numbers and IMEIs keep only their last four digits (the walk.mjs mask).
 
 ```js
 export default {
-  question: '¿Cómo imprimo las etiquetas con precio y código de barras?',
+  question: '¿Cómo imprimo las etiquetas con precio y código?',
   quien: ['cajero', 'encargado'],
   place: 'productos.etiquetas',          // place key (doco manual/places.py)
   donde: 'Productos › Etiquetas',        // as the menu reads

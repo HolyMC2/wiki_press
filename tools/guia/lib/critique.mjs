@@ -8,11 +8,18 @@ import path from 'node:path'
 import { loadPlaywright } from './session.mjs'
 import { guideDirs, ensure, readJson } from './paths.mjs'
 
+/** Shot time as the shop reads it; shots.json keeps the ISO value. */
+export function shotTime(iso, timeZone = 'America/Mazatlan') {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return String(iso)
+  return date.toLocaleString('es-MX', { timeZone, dateStyle: 'medium', timeStyle: 'short' })
+}
+
 const esc = (text) => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 /** DEFECTS.md for a shots.json (pure: tested). */
 export function defectsMarkdown(guide, shot) {
-  const lines = [`# Hallazgos: ${guide.question}`, '', `Guía \`${guide.area}/${guide.slug}\`, sitio ${shot.site}, ${shot.format}, tomada ${shot.shotAt}.`, '']
+  const lines = [`# Hallazgos: ${guide.question}`, '', `Guía \`${guide.area}/${guide.slug}\` · sitio ${shot.site} · ${shot.format} · tomada ${shotTime(shot.shotAt)}`, '']
   const all = shot.shots.flatMap(s => s.defects.map(d => ({ ...d, step: s.step, image: s.image, path: s.path })))
   const blocking = all.filter(d => d.blocks)
   lines.push(blocking.length ? `**Bloquea publicar: ${blocking.length}.** Arreglar la pantalla (o la guía) y volver a tomar.` : '**Nada bloquea según las sondas.** Falta la revisión a ojo de cada foto.', '')
@@ -44,7 +51,7 @@ function sheetHtml(guide, shot, dir, videoFrames = []) {
     img{width:100%;display:block} .n{position:absolute;top:8px;left:8px;background:#FF5A1F;color:#fff;font-weight:800;border-radius:999px;width:30px;height:30px;display:grid;place-items:center;z-index:1}
     h2{font-size:19px;margin:30px 0 14px} .grid.v{grid-template-columns:repeat(5,1fr)}
     figcaption p{font-weight:600;margin:8px 0 4px} ul{margin:0;padding-left:18px;font-size:13px} li.b{color:#b42318} li.r{color:#8a5a00}
-  </style></head><body><h1>${esc(guide.question)}</h1><p class="meta">${esc(guide.area)}/${esc(guide.slug)} · ${esc(shot.site)} · ${esc(shot.format)} · ${esc(shot.shotAt)}</p><div class="grid">${cards}</div>${videoPart}</body></html>`
+  </style></head><body><h1>${esc(guide.question)}</h1><p class="meta">${esc(guide.area)}/${esc(guide.slug)} · ${esc(shot.site)} · ${esc(shot.format)} · ${esc(shotTime(shot.shotAt))}</p><div class="grid">${cards}</div>${videoPart}</body></html>`
 }
 
 export async function critique(guide, { out, log = console.log }) {

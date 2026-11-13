@@ -1,7 +1,7 @@
-// I-10 (PLAN §3.4): labels with price and barcode, from Productos › Etiquetas.
+// I-10 (PLAN §3.4): labels with price and item code, from Productos › Etiquetas.
 // The walk stops before «Imprimir»: printing creates a print job on the site.
 export default {
-  question: '¿Cómo imprimo las etiquetas con precio y código de barras?',
+  question: '¿Cómo imprimo las etiquetas con precio y código?',
   quien: ['cajero', 'encargado'],
   place: 'productos.etiquetas',
   donde: 'Productos › Etiquetas',

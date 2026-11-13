@@ -125,10 +125,18 @@ export async function loadGuide(root, id) {
 /** A value of the guide that may depend on the fixture's data. */
 export const resolve = (value, data) => (typeof value === 'function' ? value(data) : value)
 
+/** Step text without [[n]] marks; no space is left before punctuation. */
+export function stripMarks(text) {
+  return String(text)
+    .replace(/\s*\[\[\d+\]\]\s*/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ ([.,:;!?…)])/g, '$1')
+    .trim()
+}
+
 /** Plain caption text: no [[n]], no markdown emphasis. */
 export function plainText(text) {
-  return String(text)
-    .replace(/\[\[\d+\]\]\s*/g, '')
+  return stripMarks(text)
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/[*_`]/g, '')
     .replace(/\s+/g, ' ')

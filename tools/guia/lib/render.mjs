@@ -2,6 +2,7 @@
  * Pure renderers for `guia build`: the wiki page (PLAN §2.1 template), the
  * manifest entry, Wiki Help Mapping rows and the bot playbook stub.
  */
+import { stripMarks } from './guide.mjs'
 
 export const INK = '#FF5A1F'
 const BADGE = `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:1.4em;height:1.4em;padding:0 .3em;border-radius:999px;background:${INK};color:#fff;font-size:.78em;font-weight:700;line-height:1;vertical-align:.12em">{n}</span>`
@@ -96,7 +97,7 @@ export function playbookStub(guide, { images, video }) {
     '',
     '## Pasos',
     '',
-    ...guide.steps.map((step, index) => `${index + 1}. ${String(step.text).replace(/\[\[\d+\]\]\s*/g, '')}`),
+    ...guide.steps.map((step, index) => `${index + 1}. ${stripMarks(step.text)}`),
     '',
     '## Medios',
     '',

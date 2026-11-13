@@ -2,12 +2,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
-import { validateGuide, markNumbers, plainText, resolveGuide, loadGuide, listGuides } from '../lib/guide.mjs'
+import { validateGuide, markNumbers, plainText, stripMarks, resolveGuide, loadGuide, listGuides } from '../lib/guide.mjs'
 import { englishWords, classify } from '../lib/probes.mjs'
 import { badges, pageMarkdown, helpRows, playbookStub, mergePlaybook, playbookMarker, manifestEntry } from '../lib/render.mjs'
 import { parseEnv, siteBase, checkSite } from '../lib/session.mjs'
 import { layout, filterGraph, CANVAS } from '../lib/video.mjs'
-import { defectsMarkdown } from '../lib/critique.mjs'
+import { defectsMarkdown, shotTime } from '../lib/critique.mjs'
 import { DEFAULT_GUIDES } from '../lib/paths.mjs'
 
 const GOOD = {
@@ -47,6 +47,24 @@ test('mark numbers: cited without a ring, drawn without a citation', () => {
 
 test('plain caption text drops marks and emphasis', () => {
   assert.equal(plainText('[[1]] Toca **Imprimir**  ya'), 'Toca Imprimir ya')
+})
+
+test('a mark mid-sentence leaves no space before punctuation', () => {
+  assert.equal(stripMarks('Toca el producto en la lista [[3]].'), 'Toca el producto en la lista.')
+  assert.equal(stripMarks('Así sale tu etiqueta [[5]]: nombre y precio. En **Diseño** [[6]] cambias'), 'Así sale tu etiqueta: nombre y precio. En **Diseño** cambias')
+  assert.equal(plainText('Con **−** y **+** [[4]] eliges'), 'Con − y + eliges')
+})
+
+test('playbook steps carry no stray space from marks', () => {
+  const md = playbookStub({ ...GOOD, ...AT, steps: [{ text: 'Toca el producto en la lista [[3]].' }] }, { images: [], video: null })
+  assert.match(md, /1\. Toca el producto en la lista\.\n/)
+})
+
+test('shot time shows in the shop time zone, not UTC', () => {
+  const shown = shotTime('2026-11-13T19:04:12.301Z')
+  assert.doesNotMatch(shown, /Z|T19/)
+  assert.match(shown, /12:04/)
+  assert.equal(shotTime('x'), 'x')
 })
 
 test('guide ids resolve to area and slug', () => {
