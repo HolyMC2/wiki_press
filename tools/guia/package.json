@@ -1,0 +1,10 @@
+{
+  "name": "guia",
+  "private": true,
+  "type": "module",
+  "description": "«¿Cómo hago…?» guides: shots, critique, wiki build and video from one source",
+  "bin": { "guia": "guia.mjs" },
+  "scripts": {
+    "test": "node --test 'test/*.test.mjs'"
+  }
+}

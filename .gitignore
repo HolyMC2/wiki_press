@@ -6,3 +6,4 @@ dist/
 node_modules/
 *.pyc
 __pycache__/
+.scratch/

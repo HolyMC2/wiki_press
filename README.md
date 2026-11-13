@@ -70,6 +70,12 @@ es-MX mappings ship as fixtures.
 - Upstream-friendly: generally useful pieces are frappe/wiki PR candidates
   (git push-back, book PDF).
 
+## Guide tool
+
+`tools/guia/` builds «¿Cómo hago…?» guides (marked shots, critique, wiki page,
+help rows, playbook stub, phone video) from one source per guide, shot on a lab
+site. See [tools/guia/README.md](tools/guia/README.md).
+
 ## Requirements
 
 - Frappe ≥ 16, frappe/wiki v3 ≥ develop@3dd6507 (needs the git-sync engine; rc.5 is too old)
