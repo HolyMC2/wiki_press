@@ -10,13 +10,96 @@ Why: works with ANY remote (no per-site GitHub App), no secrets sprawl, and
 every reconciliation/read-only/logging behavior stays upstream's.
 """
 
+import subprocess
 from contextlib import contextmanager
 
 import frappe
+from frappe.utils import add_to_date, cint, get_datetime, now_datetime
 
-from wiki_press.git_repo import cat_blob, ensure_work_clone, head_sha, ls_blobs
+from wiki_press.git_repo import _redact, cat_blob, ensure_work_clone, head_sha, ls_blobs
 
 PLACEHOLDER_REPO = "wiki-press/local-git"
+
+# A source whose pull fails (remote gone or unreachable, wipe guard) waits
+# before the scheduled pull tries it again: 30 min after the first failure,
+# doubling up to a day. pull_now («Sincronizar ahora») always tries.
+BACKOFF_FIRST_MINUTES = 30
+BACKOFF_MAX_MINUTES = 24 * 60
+# The cron ticks every 30 min and the job runs shortly after the tick, so a
+# wait that ends within this slack of a tick counts as due at that tick.
+SCHEDULE_SLACK_MINUTES = 5
+# While the same error repeats, it reaches the Error Log at most this often.
+RELOG_AFTER_HOURS = 24
+ERROR_TEXT_LIMIT = 1000
+
+
+def backoff_minutes(failures: int) -> int:
+	"""Minutes the scheduled pull waits after ``failures`` failed pulls in a row."""
+	if failures < 1:
+		return 0
+	return min(BACKOFF_FIRST_MINUTES * 2 ** min(failures - 1, 16), BACKOFF_MAX_MINUTES)
+
+
+def _failure_text(exc: BaseException) -> str:
+	"""The text a failed fetch leaves on the source and in the Error Log.
+
+	frappe messages from git_repo already carry git's redacted stderr. Other
+	exceptions keep their class and message, except a timeout, whose message
+	would repeat the git argv (and with it the per-command auth header)."""
+	if isinstance(exc, subprocess.TimeoutExpired):
+		text = f"git timed out after {exc.timeout} s"
+	elif isinstance(exc, frappe.ValidationError):
+		text = str(exc)
+	else:
+		text = f"{type(exc).__name__}: {exc}"
+	return _redact(text)[:ERROR_TEXT_LIMIT]
+
+
+def _should_log(source, error: str) -> bool:
+	"""One Error Log when a failure streak starts or its error text changes,
+	then at most one every RELOG_AFTER_HOURS while it repeats."""
+	if not cint(source.consecutive_failures) or (source.last_error or "") != error:
+		return True
+	last_logged = frappe.db.get_value(
+		"Error Log",
+		{"reference_doctype": "Wiki Pull Source", "reference_name": source.name},
+		"creation",
+		order_by="creation desc",
+	)
+	return not last_logged or get_datetime(last_logged) <= add_to_date(
+		now_datetime(), hours=-RELOG_AFTER_HOURS
+	)
+
+
+def _record_failure(source, error: str, title: str = "wiki_press: pull failed") -> dict:
+	"""Record a failed pull on the source and push its next scheduled try out.
+
+	Returns instead of raising: a raise into the job runner rolls this record
+	back and logs a fresh Error Log on every run."""
+	failures = cint(source.consecutive_failures) + 1
+	next_attempt = add_to_date(now_datetime(), minutes=backoff_minutes(failures))
+	if _should_log(source, error):
+		frappe.log_error(
+			title=title,
+			message=(
+				f"Wiki Pull Source {source.name} ({_redact(source.remote_url)}, "
+				f"branch {source.branch or 'main'}): {error}\n\n"
+				f"Failed pulls in a row: {failures}. The scheduled pull tries again after "
+				f"{next_attempt}; «Sincronizar ahora» on the source tries at once. While the "
+				f"error stays the same it is logged at most once every {RELOG_AFTER_HOURS} h."
+			),
+			reference_doctype="Wiki Pull Source",
+			reference_name=source.name,
+		)
+	source.db_set(
+		{
+			"last_status": "Error",
+			"last_error": error,
+			"consecutive_failures": failures,
+			"next_attempt_after": next_attempt,
+		}
+	)
+	return {"failures": failures, "next_attempt_after": next_attempt}
 
 
 def assert_transport_contract() -> None:
@@ -107,7 +190,14 @@ def pull_source(source_name: str) -> dict:
 	if not source.enabled:
 		return {"synced": False, "reason": "disabled"}
 
-	clone = ensure_work_clone(source.remote_url, source.branch or "main", f"pull-{source.name}")
+	# A remote that cannot be fetched (moved, deleted, or out of this cell's
+	# reach) is a recorded failure with a backoff, not an exception.
+	try:
+		clone = ensure_work_clone(source.remote_url, source.branch or "main", f"pull-{source.name}")
+	except Exception as exc:
+		error = _failure_text(exc)
+		return {"synced": False, "reason": "fetch-failed", "detail": error, **_record_failure(source, error)}
+
 	sha = head_sha(clone)
 	if not sha:
 		return {"synced": False, "reason": "empty remote"}
@@ -122,8 +212,7 @@ def pull_source(source_name: str) -> dict:
 			f"— this would wipe the mirror. Check the Pull Source subdir/branch."
 		)
 		frappe.db.set_value("Wiki Space", source.space, "last_sync_status", "Error", update_modified=False)
-		source.db_set({"last_status": "Error", "last_error": msg})
-		frappe.log_error(message=msg, title="wiki_press: pull wipe guard")
+		_record_failure(source, msg, title="wiki_press: pull wipe guard")
 		return {"synced": False, "reason": "wipe-guard", "detail": msg}
 
 	try:
@@ -142,6 +231,8 @@ def pull_source(source_name: str) -> dict:
 			"last_synced_on": frappe.utils.now(),
 			"last_status": status or "Success",
 			"last_error": "",
+			"consecutive_failures": 0,
+			"next_attempt_after": None,
 		}
 	)
 	return {"synced": True, "sha": sha, "space_status": status}
@@ -179,13 +270,19 @@ def pull_now(source: str) -> dict:
 
 
 def pull_all_enabled() -> None:
-	"""Scheduler entry: pull every enabled source, isolated per source."""
-	for name in frappe.get_all("Wiki Pull Source", filters={"enabled": 1}, pluck="name"):
+	"""Scheduler entry: pull every enabled source that is due, isolated per
+	source. A source that failed waits until its next_attempt_after."""
+	due_by = add_to_date(now_datetime(), minutes=SCHEDULE_SLACK_MINUTES)
+	for row in frappe.get_all(
+		"Wiki Pull Source", filters={"enabled": 1}, fields=["name", "next_attempt_after"]
+	):
+		if row.next_attempt_after and get_datetime(row.next_attempt_after) > due_by:
+			continue
 		frappe.enqueue(
 			"wiki_press.git_pull.pull_source",
-			source_name=name,
+			source_name=row.name,
 			queue="long",
 			timeout=600,
-			job_id=f"wiki_press:pull:{name}",
+			job_id=f"wiki_press:pull:{row.name}",
 			deduplicate=True,
 		)

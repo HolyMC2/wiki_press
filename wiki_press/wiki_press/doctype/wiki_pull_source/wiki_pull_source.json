@@ -15,7 +15,9 @@
   "last_status",
   "last_synced_on",
   "last_synced_sha",
-  "last_error"
+  "last_error",
+  "consecutive_failures",
+  "next_attempt_after"
  ],
  "fields": [
   {
@@ -86,10 +88,27 @@
    "fieldtype": "Small Text",
    "label": "Last Error",
    "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "consecutive_failures",
+   "fieldtype": "Int",
+   "label": "Consecutive Failures",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "depends_on": "next_attempt_after",
+   "description": "After a failed pull the 30-minute schedule skips this source until then, waiting twice as long after each failure, up to a day. «Sincronizar ahora» always tries. Changing the remote, branch or subdirectory clears the wait.",
+   "fieldname": "next_attempt_after",
+   "fieldtype": "Datetime",
+   "label": "Next Attempt After",
+   "no_copy": 1,
+   "read_only": 1
   }
  ],
  "links": [],
- "modified": "2026-07-08 10:00:00.000000",
+ "modified": "2026-11-12 21:30:00.000000",
  "modified_by": "Administrator",
  "module": "Wiki Press",
  "name": "Wiki Pull Source",

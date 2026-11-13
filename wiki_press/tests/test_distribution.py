@@ -49,13 +49,21 @@ def _make_space(suffix: str, route_prefix: str, pages: dict[str, str]):
 	return space
 
 
-class TestDistributionRoundTrip(FrappeTestCase):
+class HubFixture:
+	"""A bare hub repo in a temp dir, the shape of the bench-local manual hub.
+	Mix in before FrappeTestCase; not a TestCase itself, so importing it from
+	another test module does not run this module's tests twice."""
+
 	def setUp(self):
+		super().setUp()
 		frappe.set_user("Administrator")
 		self.tmp = tempfile.mkdtemp(prefix="wiki_press_hub_")
 		self.hub = os.path.join(self.tmp, "hub.git")
 		subprocess.run(["git", "init", "-q", "--bare", "-b", "main", self.hub], check=True)
 		self.suffix = frappe.generate_hash(length=8)
+
+
+class TestDistributionRoundTrip(HubFixture, FrappeTestCase):
 
 	def test_publish_then_pull_reproduces_content(self):
 		pages = {
