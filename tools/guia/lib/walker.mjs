@@ -80,12 +80,32 @@ export function walker(page, base, { video = false } = {}) {
     async tapText(text, options) {
       await w.tap(w.byText(text), options)
     },
+    /**
+     * Focus a field and type into it in one action: the first character (the
+     * whole text in shoot mode) goes in from the focus event itself, before
+     * the app reacts to the focus, so no frame shows the field focused and
+     * empty (a search's «recent» panel, other people's edits). Video types
+     * the rest slowly enough to read.
+     */
     async type(target, text, { clear = true } = {}) {
       const loc = seen(page, target)
+      const plan = typingPlan(text, { video, clear })
+      const handle = plan.onFocus ? await loc.elementHandle({ timeout: 10000 }) : null
+      if (handle) await handle.evaluate(armFocusFill, plan.onFocus)
       await w.tap(loc, { hold: 250 })
-      if (clear) await loc.fill('')
-      if (video) await loc.pressSequentially(text, { delay: 70 })
-      else await loc.fill(text)
+      if (!handle) {
+        if (video) await loc.pressSequentially(text, { delay: 70 })
+        else await loc.fill(text)
+        return
+      }
+      const filled = await handle.evaluate(disarmFocusFill)
+      // Already focused, so no focus event: replace the value in one step (no empty frame either).
+      if (!filled) await loc.fill(plan.onFocus)
+      if (plan.rest) {
+        await handle.evaluate((el) => { const n = el.value.length; try { el.setSelectionRange(n, n) } catch { /* a field without a caret */ } })
+        await loc.pressSequentially(plan.rest, { delay: 70 })
+      }
+      await handle.dispose()
     },
     async press(target, key) {
       await seen(page, target).press(key)
@@ -102,18 +122,41 @@ export function walker(page, base, { video = false } = {}) {
       }
       return false
     },
+    /** True when nothing is in flight now (no idle wait). */
+    idleNow: () => inflight.size === 0,
+    /** True when `target` shows in some frame now. */
+    async showing(target) {
+      return (await seen(page, target).count().catch(() => 0)) > 0
+    },
+    /** True when one of `texts` shows in any frame now. */
+    async busyNow(texts) {
+      for (const frame of page.frames()) {
+        for (const text of texts || []) {
+          if (await frame.getByText(text, { exact: false }).filter({ visible: true }).count().catch(() => 0)) return text
+        }
+      }
+      return null
+    },
+    /**
+     * Wait until the iframe `target` has its document loaded and drawn: ready
+     * state complete and something in its body (a label preview in srcdoc).
+     */
+    async frameLoaded(target, timeout = 20000) {
+      const handle = await seen(page, target).elementHandle({ timeout })
+      try {
+        const frame = await handle.contentFrame()
+        if (!frame) throw new Error('el marco no tiene documento')
+        await frame.waitForFunction(() => document.readyState === 'complete' && !!document.body && document.body.childElementCount > 0, null, { timeout })
+      } finally {
+        await handle.dispose()
+      }
+    },
     /** Wait until none of `texts` («Buscando…», «Dibujando las etiquetas…») shows in any frame. */
     async gone(texts, timeout = 20000) {
       if (!texts?.length) return
       const until = Date.now() + timeout
       for (;;) {
-        let showing = null
-        for (const frame of page.frames()) {
-          for (const text of texts) {
-            if (await frame.getByText(text, { exact: false }).filter({ visible: true }).count().catch(() => 0)) { showing = text; break }
-          }
-          if (showing) break
-        }
+        const showing = await w.busyNow(texts)
         if (!showing) return
         if (Date.now() > until) throw new Error(`sigue en pantalla «${showing}»`)
         await page.waitForTimeout(100)
@@ -144,6 +187,7 @@ export function walker(page, base, { video = false } = {}) {
     },
     pause,
   }
+  w.settle = (options) => settle(w, options)
   return w
 }
 
@@ -172,12 +216,75 @@ export async function runStep(w, step, data, { busy = [] } = {}) {
 }
 
 /**
+ * What `w.type` puts in from the focus event (`onFocus`) and what it types
+ * after (`rest`). Pure: tested. Appending to a field (`clear: false`) keeps
+ * the old focus-then-type path.
+ */
+export function typingPlan(text, { video = false, clear = true } = {}) {
+  const chars = Array.from(String(text ?? ''))
+  if (!clear || !chars.length) return { onFocus: null, rest: chars.join('') }
+  if (!video) return { onFocus: chars.join(''), rest: '' }
+  return { onFocus: chars[0], rest: chars.slice(1).join('') }
+}
+
+/**
+ * In-page: the next focus of `el` sets its value to `value` and fires
+ * `input` before any of the app's own focus handlers run (a window capture
+ * listener runs first), in the same task, so the app's first render after
+ * the focus already has the text.
+ */
+export function armFocusFill(el, value) {
+  const win = el.ownerDocument.defaultView
+  el.__guiaDisarm?.()
+  el.__guiaFilled = false
+  const onFocus = (event) => {
+    if (event.target !== el) return
+    win.removeEventListener('focus', onFocus, true)
+    el.value = value
+    el.dispatchEvent(new win.Event('input', { bubbles: true }))
+    el.__guiaFilled = true
+  }
+  win.addEventListener('focus', onFocus, true)
+  el.__guiaDisarm = () => win.removeEventListener('focus', onFocus, true)
+}
+
+/** In-page: drop a listener armFocusFill left; true when it filled the field. */
+export function disarmFocusFill(el) {
+  el.__guiaDisarm?.()
+  delete el.__guiaDisarm
+  const filled = !!el.__guiaFilled
+  delete el.__guiaFilled
+  return filled
+}
+
+/**
+ * Wait until a screen has finished drawing: `ready` shows, no request in
+ * flight, none of `busy` on screen, the iframe `frame` loaded, and all of it
+ * still true on one last look (a redraw can start right after a quiet spell).
+ * For an `after` whose result keeps drawing (a label preview), so the next
+ * caption never opens on a loading screen.
+ */
+export async function settle(w, { ready, frame, busy = [], rounds = 5 } = {}) {
+  for (let round = 0; round < rounds; round++) {
+    if (ready) await w.wait(ready)
+    await w.quiet()
+    await w.gone(busy)
+    if (frame) await w.frameLoaded(frame)
+    const calm = w.idleNow() && !(await w.busyNow(busy)) && (!ready || await w.showing(ready))
+    if (calm) return round + 1
+  }
+  throw new Error(`la pantalla no termina de dibujarse${ready ? ` (${ready})` : ''}`)
+}
+
+/**
  * End a step with the tap its text asks for (`after`: «toca Etiquetas»,
  * «tócalo»), once its shot is taken or its marks have shown: in the video it
  * plays under its own step's caption, never under the next one. Returns as
  * soon as `after` sees its result on screen (the new page's field, the picked
  * row): the requests it started are waited out by the next step's runStep,
- * under the next caption.
+ * under the next caption. An `after` whose result keeps drawing (a label
+ * preview) waits it out itself with `settle`, so the next caption never
+ * opens on a loading screen.
  */
 export async function finishStep(w, step, data) {
   if (!step.after) return false

@@ -2,7 +2,7 @@
  * Capture-only stylesheet: loaded into every frame of `shoot` and `video`,
  * never shipped with the app. It hides what belongs to the capture account or
  * the lab site and not to the screen the guide shows: notification counts and
- * account or lab notices. A guide shot with a red count or a banner on it is a
+ * account or lab notices, lists of other people's recent edits. A guide shot with a red count or a banner on it is a
  * defect; hiding it here keeps the lab untouched.
  */
 
@@ -14,6 +14,11 @@ button:has(> .lucide-bell) > .bg-surface-red-7,
 nav .rounded-full.bg-surface-red-7,
 /* Mi cuenta's notice (invoice past due, suspension) for the lab's plan. */
 [data-testid="shell-cuenta-aviso"],
+/* A search's «recently edited» list (Etiquetas: «Editados hace poco»): other
+   people's edits, lab test items among them, never belong in a guide. */
+[data-etq-results] ul[aria-label="Editados hace poco"],
+[data-etq-results] p:has(+ ul[aria-label="Editados hace poco"]),
+[data-guia-recent-edits],
 /* Escape hatch for an app that marks its own capture-noise. */
 [data-guia-hide] {
   display: none !important;

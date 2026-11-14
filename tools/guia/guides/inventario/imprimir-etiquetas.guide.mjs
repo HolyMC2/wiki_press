@@ -1,5 +1,13 @@
 // I-10 (PLAN §3.4): labels with price and item code, from Productos › Etiquetas.
 // The walk stops before «Imprimir»: printing creates a print job on the site.
+// The label preview done drawing: the stage not busy, its frame loaded, no
+// «Dibujando las etiquetas…» in any frame, nothing in flight.
+export const LABEL_DRAWN = {
+  ready: '[data-etq-preview] [data-etq-stage][aria-busy="false"] iframe',
+  frame: '[data-etq-preview] [data-etq-stage] iframe',
+  busy: ['Dibujando las etiquetas'],
+}
+
 export default {
   question: '¿Cómo imprimo las etiquetas con precio y código?',
   quien: ['cajero', 'encargado'],
@@ -37,6 +45,8 @@ export default {
     {
       text: '[[2]] Escribe el nombre o el código, o escanea la etiqueta del proveedor. Toca el producto en la lista [[3]].',
       caption: 'Busca el producto por nombre o código y tócalo',
+      // Focus and first letter in one action (w.type): the empty field's
+      // «Editados hace poco» (other people's edits) never gets a frame.
       async action(w, data) {
         await w.type('[data-etq-search]', data.query)
         await w.wait('[data-etq-results] li button')
@@ -46,10 +56,12 @@ export default {
         { ring: '[data-etq-search]', n: 2, shape: 'box', pad: 4 },
         { ring: `[data-etq-results] li button:has-text("${data.item_name}")`, n: 3, shape: 'box', pad: 3 },
       ],
-      // «Toca el producto»: under this caption, not the next one.
+      // «Toca el producto»: under this caption, not the next one, and it ends
+      // with the label drawn, so caption 3 never opens on «Dibujando…».
       async after(w, data) {
         await w.tap(`[data-etq-results] li button:has-text("${data.item_name}")`)
         await w.wait('[data-etq-row]')
+        await w.settle(LABEL_DRAWN)
       },
     },
     {

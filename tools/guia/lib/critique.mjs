@@ -17,8 +17,51 @@ export function shotTime(iso, timeZone = 'America/Mazatlan') {
 
 const esc = (text) => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-/** DEFECTS.md for a shots.json (pure: tested). */
-export function defectsMarkdown(guide, shot) {
+const EYE = '## Revisión a ojo'
+const AUTO_START = '<!-- guia critique: nota automática -->'
+const AUTO_END = '<!-- /guia critique -->'
+const EYE_HINT = 'Anotar aquí lo que las sondas no ven: aspecto viejo, iconos de relleno, estados vacíos, nombres reales, carga a medias.'
+
+/**
+ * What a person wrote under «Revisión a ojo» in an earlier DEFECTS.md, without
+ * the automatic note or the hint (pure: tested). A new critique keeps it.
+ */
+export function eyeNotes(previous) {
+  const text = String(previous || '')
+  const at = text.indexOf(EYE)
+  if (at < 0) return ''
+  let body = text.slice(at + EYE.length)
+  const next = body.search(/^## /m)
+  if (next >= 0) body = body.slice(0, next)
+  for (;;) {
+    const start = body.indexOf(AUTO_START)
+    if (start < 0) break
+    const end = body.indexOf(AUTO_END, start)
+    body = body.slice(0, start) + (end < 0 ? '' : body.slice(end + AUTO_END.length))
+  }
+  return body.split(EYE_HINT).join('').trim()
+}
+
+/** The note `guia critique` writes under «Revisión a ojo» every run, so it is never empty. */
+export function eyeCheckNote(shot, { at = new Date().toISOString(), videoFrames = 0 } = {}) {
+  const all = shot.shots.flatMap(s => s.defects)
+  const blocking = all.filter(d => d.blocks).length
+  const review = all.length - blocking
+  const frames = videoFrames ? ` y ${videoFrames} cuadro(s) del video` : ''
+  const lines = [
+    AUTO_START,
+    `Crítica corrida ${shotTime(at)}: \`contact-sheet.png\` con ${shot.shots.length} foto(s)${frames}. Sondas: ${blocking} bloquea(n), ${review} a revisar${shot.failed ? `, recorrido detenido en ${shot.failed}` : ''}.`,
+    '',
+    'Mirar en la hoja, foto por foto, lo que las sondas no ven: aspecto viejo, iconos de relleno, estados vacíos, nombres reales, listas de otras personas, carga a medias.',
+    '',
+    ...shot.shots.map(s => `- [ ] Paso ${s.step} · \`${s.image}\` · ${s.caption || s.path}`),
+    AUTO_END,
+  ]
+  return lines.join('\n')
+}
+
+/** DEFECTS.md for a shots.json (pure: tested). `eye`: a person's earlier notes, kept. */
+export function defectsMarkdown(guide, shot, { eye = '', at, videoFrames = 0 } = {}) {
   const lines = [`# Hallazgos: ${guide.question}`, '', `Guía \`${guide.area}/${guide.slug}\` · sitio ${shot.site} · ${shot.format} · tomada ${shotTime(shot.shotAt)}`, '']
   const all = shot.shots.flatMap(s => s.defects.map(d => ({ ...d, step: s.step, image: s.image, path: s.path })))
   const blocking = all.filter(d => d.blocks)
@@ -30,7 +73,8 @@ export function defectsMarkdown(guide, shot) {
     for (const d of s.defects) lines.push(`- ${d.blocks ? '**bloquea**' : 'revisar'} · ${d.kind}: ${d.text}`)
     if (s.defects.length) lines.push('')
   }
-  lines.push('## Revisión a ojo', '', 'Anotar aquí lo que las sondas no ven: aspecto viejo, iconos de relleno, estados vacíos, nombres reales, carga a medias.', '')
+  lines.push(EYE, '', eyeCheckNote(shot, { at, videoFrames }), '')
+  if (eye) lines.push(eye, '')
   return `${lines.join('\n')}\n`
 }
 
@@ -59,12 +103,13 @@ export async function critique(guide, { out, log = console.log }) {
   const shot = readJson(dirs.shotsJson, null)
   if (!shot) throw new Error(`no hay fotos de ${guide.area}/${guide.slug}: corre guia shoot primero`)
   ensure(dirs.critique)
+  let videoFrames = []
   const { chromium } = await loadPlaywright()
   const browser = await chromium.launch()
   try {
     const page = await browser.newPage({ viewport: { width: guide.format === 'phone' ? 1600 : 1800, height: 900 } })
     const timeline = readJson(path.join(dirs.video, 'timeline.json'), null)
-    const videoFrames = (timeline?.steps || [])
+    videoFrames = (timeline?.steps || [])
       .map(step => ({ n: step.n, caption: step.caption, file: path.join(dirs.video, 'cuadros', `paso-${step.n}.png`) }))
       .filter(frame => fs.existsSync(frame.file))
     await page.setContent(sheetHtml(guide, shot, dirs.shots, videoFrames))
@@ -73,7 +118,9 @@ export async function critique(guide, { out, log = console.log }) {
   } finally {
     await browser.close()
   }
-  fs.writeFileSync(path.join(dirs.critique, 'DEFECTS.md'), defectsMarkdown(guide, shot))
+  const defectsFile = path.join(dirs.critique, 'DEFECTS.md')
+  const eye = fs.existsSync(defectsFile) ? eyeNotes(fs.readFileSync(defectsFile, 'utf8')) : ''
+  fs.writeFileSync(defectsFile, defectsMarkdown(guide, shot, { eye, videoFrames: videoFrames.length }))
   const blocking = shot.shots.flatMap(s => s.defects).filter(d => d.blocks)
   log(`hoja: ${path.join(dirs.critique, 'contact-sheet.png')}`)
   log(`hallazgos: ${path.join(dirs.critique, 'DEFECTS.md')} (${blocking.length} bloquea(n))`)

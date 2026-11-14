@@ -157,8 +157,13 @@ export default {
 - `text`, `caption`, `route`, `ready`, `busy`, `marks` may be functions of the
   fixture data. `busy` (guide or step): texts no shot or step end may show.
 - The walker `w` has `goto`, `wait`, `tap`, `tapText`, `type`, `press`, `show`,
-  `locator`, `byText`; `shoot` and `video` run the same steps (the video shows
-  the finger and types slowly).
+  `settle`, `locator`, `byText`; `shoot` and `video` run the same steps (the
+  video shows the finger and types slowly). `type` puts the first letter in
+  with the focus, so no frame shows a focused empty field (a search's recent
+  list). `settle({ ready, frame, busy })` waits until a screen has finished
+  drawing (an iframe loaded, no busy text, nothing in flight): an `after`
+  whose result keeps drawing ends with it, so the next caption never opens
+  on a loading screen.
 - Marks: `{ ring, n, shape: 'oval'|'box', pad, nAt: 'tl'|'tr'|'br'|'bl'|'l'|'r'|'t'|'b' }`
   (`nAt` is the side the number tries first),
   `{ tap }`, `{ note: 'Toca aquí', to }`, `{ spot: [...] }`. A target is a
@@ -173,7 +178,9 @@ On every shot, before the marks: floating toasts and alerts, English words,
 text cut with an ellipsis or a line clamp, page overflow, broken images,
 loading skeletons, a Desk route, console errors. It does not see design: look
 at every frame of the contact sheet (old looks, placeholder icons, empty
-states, real names) and write what you saw at the end of `DEFECTS.md`. A
+states, real names) and write what you saw at the end of `DEFECTS.md`. Each
+run writes its own note under «Revisión a ojo» (when, how many shots, a box
+per shot) and keeps what a person wrote there before. A
 screen that fails is an app defect to fix, not something to crop around.
 
 ## Publishing (not automated here)
