@@ -12,7 +12,8 @@ import path from 'node:path'
 import { spawn, execFileSync } from 'node:child_process'
 import { openSession, readSecret, siteBase, checkSite, loadPlaywright } from './session.mjs'
 import { resolveFixture } from './fixtures.mjs'
-import { walker, runStep, applyRename } from './walker.mjs'
+import { walker, runStep, finishStep, applyRename, installRename } from './walker.mjs'
+import { installResponseRename } from './rewrite.mjs'
 import { drawMarks, clearMarks } from './marks.mjs'
 import { plainText, resolve } from './guide.mjs'
 import { guideDirs, ensure, writeJson, videoName, posterName } from './paths.mjs'
@@ -116,6 +117,54 @@ async function renderPng(browser, html, file, transparent = false) {
   await p.close()
 }
 
+// Video pacing of a step (ms): a look at the caption, the settled screen, the marks, the closing look.
+export const PACING = { lead: 700, look: 500, marks: 2200, afterMarks: 300, tail: 900 }
+
+/**
+ * Play the steps in order and return their timeline (seconds from the
+ * recording's start). A step's caption starts before anything of it happens
+ * and the step ends only after its own closing tap (`after`) has played, so a
+ * tap never runs under the next step's caption; it ends right then, as soon as
+ * the tap's result is on screen, so its caption does not linger over the next
+ * screen. `hooks` carry the browser work; tests pass a fake clock.
+ */
+export async function playSteps(guideSteps, { now, wait, caption, run, marks, draw, clear, finish }, pacing = PACING) {
+  const timeline = []
+  for (const [index, step] of guideSteps.entries()) {
+    const entry = { n: index + 1, caption: caption(step), start: now() }
+    timeline.push(entry)
+    await wait(pacing.lead)
+    await run(step, index)
+    await wait(pacing.look)
+    const drawn = marks(step)
+    if (drawn.length) {
+      await draw(drawn, index)
+      entry.marked = now()
+      await wait(pacing.marks)
+      await clear()
+    }
+    if (step.after) {
+      await wait(pacing.afterMarks)
+      entry.after = now()
+      await finish(step, index)
+      entry.afterEnd = now()
+      // The closing tap has brought up what the next step is about (a new
+      // page, the picked row): the next caption takes over at once instead of
+      // holding this one over a screen it no longer describes.
+      entry.end = entry.afterEnd
+      continue
+    }
+    await wait(pacing.tail)
+    entry.end = now()
+  }
+  return timeline
+}
+
+/** When each caption shows (seconds of the recording): from its step's start to the next step's start. */
+export function captionWindows(steps, body) {
+  return steps.map((step, i) => ({ n: step.n, from: step.start, to: steps[i + 1]?.start ?? body }))
+}
+
 /** The ffmpeg filter graph (pure: tested). Inputs: 0 raw, 1 background, 2 corners, 3 intro, 4 outro, 5… captions. */
 export function filterGraph(L, steps, body) {
   const end = INTRO + body
@@ -124,9 +173,9 @@ export function filterGraph(L, steps, body) {
     `[1:v][app]overlay=${L.x}:${L.y}:shortest=1[a]`,
     '[a][2:v]overlay=0:0[b0]',
   ]
-  steps.forEach((step, i) => {
-    const from = (INTRO + step.start).toFixed(3)
-    const to = (INTRO + (steps[i + 1]?.start ?? body)).toFixed(3)
+  captionWindows(steps, body).forEach((window, i) => {
+    const from = (INTRO + window.from).toFixed(3)
+    const to = (INTRO + window.to).toFixed(3)
     chain.push(`[b${i}][${i + 5}:v]overlay=0:0:enable='between(t,${from},${to})'[b${i + 1}]`)
   })
   const last = `b${steps.length}`
@@ -154,32 +203,37 @@ export async function video(guide, { out, site, fixtures, log = console.log }) {
     const { context, page: tab, size } = session
     screen = [even(size.width * size.scale), even(size.height * size.scale)]
     const { data, rename } = await resolveFixture(fixtures, guide.fixture, { context, base, args: guide.fixtureArgs || {} })
+    await installResponseRename(context, base, rename)
+    await installRename(context, rename)
     const w = walker(tab, base, { video: true })
-    // The first screen loads before recording starts, so the video opens on a painted page.
+    // The first screen loads and settles before recording starts, so the video
+    // opens on the same painted page as the first still (late shell buttons included).
     const first = guide.steps[0]
-    if (first.route) await w.goto(first.route)
+    const firstRoute = resolve(first.route, data)
+    if (firstRoute) await w.goto(firstRoute)
+    const firstReady = resolve(first.ready, data)
+    if (firstReady) await w.wait(firstReady)
+    await w.quiet()
     await applyRename(tab, rename)
     const sweep = setInterval(() => { applyRename(tab, rename).catch(() => {}) }, 200)
     rec = await startRecording(context, tab, screen)
     const now = () => Date.now() / 1000 - rec.startedAt
     try {
-      for (const [index, step] of guide.steps.entries()) {
-        const caption = resolve(step.caption, data) || plainText(resolve(step.text, data))
-        steps.push({ n: index + 1, caption, start: now() })
-        await tab.waitForTimeout(700)
-        await runStep(w, index === 0 ? { ...step, route: null } : step, data)
-        await applyRename(tab, rename)
-        await tab.waitForTimeout(500)
-        const marks = resolve(step.marks, data) || []
-        if (marks.length) {
-          await drawMarks(tab, marks, { seed: 11 + index })
-          steps[index].marked = now()
-          await tab.waitForTimeout(2200)
-          await clearMarks(tab)
-        }
-        await tab.waitForTimeout(900)
-        steps[index].end = now()
-      }
+      steps.push(...await playSteps(guide.steps, {
+        now,
+        wait: (ms) => tab.waitForTimeout(ms),
+        caption: (step) => resolve(step.caption, data) || plainText(resolve(step.text, data)),
+        run: async (step, index) => {
+          await runStep(w, index === 0 ? { ...step, route: null } : step, data, { busy: guide.busy })
+          await applyRename(tab, rename)
+        },
+        marks: (step) => resolve(step.marks, data) || [],
+        draw: (marks, index) => drawMarks(tab, marks, { seed: 11 + index }),
+        clear: () => clearMarks(tab),
+        finish: async (step) => {
+          if (await finishStep(w, step, data)) await applyRename(tab, rename)
+        },
+      }))
     } finally {
       clearInterval(sweep)
     }

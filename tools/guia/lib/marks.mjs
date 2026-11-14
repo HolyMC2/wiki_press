@@ -5,7 +5,8 @@
  * screenshot with a marker.
  *
  *   { ring: target, n: 1 }            a hand-drawn loop around it, with a number
- *                                     (shape: oval | box, pad, nAt: tl | tr | l)
+ *                                     (shape: oval | box, pad, nAt: the side the
+ *                                     number tries first: tl tr br bl l r t b)
  *   { tap: target }                   a finger-press ripple on it
  *   { note: 'Toca aquí', to: target } a label with a curved arrow to it
  *   { note: '…', at: { x: .5, y: .2 } }  a label alone, at a fraction of the screen
@@ -15,8 +16,12 @@
  * function `(tab) => Locator`, a list of targets (one loop around them all) or,
  * for `to`, a point `{ x, y }` as fractions of the screen (something inside a
  * camera picture). Boxes are read in Node and the drawing is one fixed
- * overlay, so the app underneath is never touched.
+ * overlay, so the app underneath is never touched. Numbers sit outside their
+ * loop, where they cover no other mark and no word, icon or control, and
+ * never nearer another control than their own loop (bubbles.mjs).
  */
+
+import { placeBubbles, ringShape } from './bubbles.mjs'
 
 export const INK = '#FF5A1F'
 
@@ -45,9 +50,93 @@ export async function drawMarks(tab, marks, { seed = 7 } = {}) {
     const out = { ...mark }
     for (const key of ['ring', 'tap', 'to']) if (mark[key]) out[key] = await boxOf(tab, mark[key])
     if (mark.spot) out.spot = await Promise.all(mark.spot.map(target => boxOf(tab, target)))
+    if (out.ring) out.shape = ringShape(out)
     resolved.push(out)
   }
+  // Bubbles go where they cover no other mark and no word or icon on the page.
+  const obstacles = resolved.some(mark => mark.n != null) ? await tab.evaluate(visibleInk) : []
+  const { width, height } = tab.viewportSize()
+  for (const [index, at] of placeBubbles(resolved, obstacles, { width, height })) resolved[index].bubble = at
   await tab.evaluate(paint, { marks: resolved, ink: INK, seed })
+}
+
+/*
+ * Runs in the page: boxes of the words and icons a person sees, so bubbles
+ * can stay off them. Text hidden under an overlay or clipped by a scroller
+ * is left out (the topmost element at its centre must be its own).
+ */
+function visibleInk() {
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const out = []
+  const onScreen = (r) => r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < vw && r.top < vh
+  const seen = (el, r) => {
+    const x = Math.min(vw - 1, Math.max(0, r.left + r.width / 2))
+    const y = Math.min(vh - 1, Math.max(0, r.top + r.height / 2))
+    const top = document.elementFromPoint(x, y)
+    return Boolean(top && (top === el || el.contains(top) || top.contains(el)))
+  }
+  const add = (r) => out.push({ x: r.left, y: r.top, width: r.width, height: r.height })
+  const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+  const range = document.createRange()
+  let node
+  while ((node = walk.nextNode()) && out.length < 2000) {
+    if (!node.nodeValue.trim()) continue
+    const parent = node.parentElement
+    if (!parent || parent.closest('#manual-marks')) continue
+    range.selectNodeContents(node)
+    for (const r of range.getClientRects()) if (onScreen(r) && seen(parent, r)) add(r)
+  }
+  for (const el of document.querySelectorAll('svg, img, iframe, canvas, video, [class*="lucide-"]')) {
+    if (el.closest('#manual-marks')) continue
+    const r = el.getBoundingClientRect()
+    if (onScreen(r) && seen(el, r)) add(r)
+  }
+  // Drawn edges: a card's border or shadow, the edge of a sticky or fixed bar.
+  // Each becomes a thin strip so a number can sit inside a card but not on its line.
+  const painted = (c) => c && c !== 'transparent' && !/rgba\([^)]*,\s*0\)$/.test(c)
+  const strip = (x, y, width, height) => {
+    const left = Math.max(0, x)
+    const top = Math.max(0, y)
+    const w = Math.min(vw, x + width) - left
+    const h = Math.min(vh, y + height) - top
+    if (w > 0 && h > 0) out.push({ x: left, y: top, width: w, height: h, edge: true })
+  }
+  let edges = 0
+  for (const el of document.body.querySelectorAll('*')) {
+    if (edges > 600) break
+    if (el.closest('#manual-marks') || el instanceof SVGElement) continue
+    const r = el.getBoundingClientRect()
+    if (r.width < 40 || r.height < 20 || !onScreen(r)) continue
+    const cs = getComputedStyle(el)
+    if (cs.visibility === 'hidden' || cs.display === 'contents') continue
+    const pinned = cs.position === 'fixed' || cs.position === 'sticky'
+    const shadow = cs.boxShadow && cs.boxShadow !== 'none'
+    const sides = [
+      ['Top', () => strip(r.left, r.top, r.width, 1), r.left + r.width / 2, r.top + 0.5],
+      ['Bottom', () => strip(r.left, r.bottom - 1, r.width, 1), r.left + r.width / 2, r.bottom - 0.5],
+      ['Left', () => strip(r.left, r.top, 1, r.height), r.left + 0.5, r.top + r.height / 2],
+      ['Right', () => strip(r.right - 1, r.top, 1, r.height), r.right - 0.5, r.top + r.height / 2],
+    ]
+    for (const [side, add, px, py] of sides) {
+      const bordered = parseFloat(cs[`border${side}Width`]) > 0 && painted(cs[`border${side}Color`]) && cs[`border${side}Style`] !== 'none'
+      const barEdge = pinned && painted(cs.backgroundColor) && (side === 'Top' || side === 'Bottom')
+      if (!bordered && !shadow && !barEdge) continue
+      const x = Math.min(vw - 1, Math.max(0, px))
+      const y = Math.min(vh - 1, Math.max(0, py))
+      const hit = document.elementFromPoint(x, y)
+      if (!hit || !(hit === el || el.contains(hit))) continue
+      add()
+      edges += 1
+    }
+  }
+  // Controls: a field's placeholder is no text node, and a number must not sit nearer another control than its own.
+  for (const el of document.querySelectorAll('input:not([type=hidden]), textarea, select, button, a[href], [role="button"], [contenteditable="true"]')) {
+    if (el.closest('#manual-marks')) continue
+    const r = el.getBoundingClientRect()
+    if (onScreen(r) && seen(el, r)) out.push({ x: r.left, y: r.top, width: r.width, height: r.height, control: true })
+  }
+  return out
 }
 
 export async function clearMarks(tab) {
@@ -164,20 +253,14 @@ function paint({ marks, ink, seed }) {
     label.textContent = String(n)
   }
 
+  // Bubbles are drawn after every loop and ripple, so no stroke crosses a number.
+  const bubbles = []
   for (const mark of marks) {
     if (mark.ring) {
       const shape = mark.shape || (mark.ring.width / Math.max(1, mark.ring.height) > 3.2 ? 'box' : 'oval')
       const box = pad(mark.ring, mark.pad ?? 7)
       stroke(loop(box, shape))
-      if (mark.n != null) {
-        // `nAt`: tl (default), tr or l; on the stroke, so it never sits on the words inside.
-        const corner = shape === 'oval'
-          ? { x: box.x + box.width / 2 - box.width / 2 * 1.1 * 0.72, y: box.y + box.height / 2 - box.height / 2 * 1.2 * 0.72 }
-          : mark.nAt === 'tr' ? { x: box.x + box.width - 2, y: box.y - 2 }
-            : mark.nAt === 'l' ? { x: box.x - 2, y: box.y + box.height / 2 }
-              : { x: box.x - 2, y: box.y - 2 }
-        badge(corner.x, corner.y, mark.n)
-      }
+      if (mark.n != null && mark.bubble) bubbles.push([mark.bubble.x, mark.bubble.y, mark.n])
     }
     if (mark.tap) {
       const x = mark.tap.x + mark.tap.width * (mark.tapAt?.[0] ?? 0.5)
@@ -187,9 +270,10 @@ function paint({ marks, ink, seed }) {
         el('circle', { cx: x, cy: y, r, fill: 'none', stroke: '#fff', 'stroke-width': 7, opacity: 0.8 * opacity })
         el('circle', { cx: x, cy: y, r, fill: 'none', stroke: ink, 'stroke-width': 3.5, opacity })
       }
-      if (mark.n != null) badge(x + 28, y - 28, mark.n)
+      if (mark.n != null) bubbles.push([mark.bubble?.x ?? x + 28, mark.bubble?.y ?? y - 28, mark.n])
     }
   }
+  for (const [x, y, n] of bubbles) badge(x, y, n)
 
   for (const mark of marks) {
     if (!mark.note) continue

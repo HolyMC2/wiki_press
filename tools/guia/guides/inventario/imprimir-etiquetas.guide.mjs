@@ -9,6 +9,9 @@ export default {
   fixture: 'catalogo-con-precio',
   fixtureArgs: { buscar: 'Funda' },
   order: 10,
+  // In-between screens no step may end on: a debounced search still running,
+  // its premature «no product» line, a label preview still drawing.
+  busy: ['Buscando', 'Ningún producto se llama así', 'Dibujando las etiquetas'],
   resumen: [
     'En Productos › Etiquetas buscas o escaneas lo que quieres etiquetar.',
     'La etiqueta sale con el precio de venta y el código; tú eliges cuántas copias.',
@@ -18,16 +21,23 @@ export default {
     {
       text: '[[1]] En **Productos**, toca **Etiquetas**.',
       caption: 'En Productos, toca «Etiquetas»',
-      route: '/crm/productos',
-      ready: 'a[href="/crm/productos/etiquetas"]',
+      // The list filtered to the fixture's demo product: the whole catalogue
+      // would show real rows («Sin precio», typos) and photos with a store's
+      // logo in public media. `listQuery` only finds rows without an unchecked photo.
+      route: (data) => `/crm/productos?q=${encodeURIComponent(data.listQuery)}`,
+      // The list, not only the toolbar: a shot before it loads shows «Cargando productos…».
+      ready: '[data-productos-scroller] [data-key]',
       marks: [{ ring: 'a[href="/crm/productos/etiquetas"]', n: 1, shape: 'box', pad: 4, nAt: 'tr' }],
+      // The tap this step asks for plays under its own caption.
+      async after(w) {
+        await w.tap('a[href="/crm/productos/etiquetas"]')
+        await w.wait('[data-etq-search]')
+      },
     },
     {
       text: '[[2]] Escribe el nombre o el código, o escanea la etiqueta del proveedor. Toca el producto en la lista [[3]].',
       caption: 'Busca el producto por nombre o código y tócalo',
       async action(w, data) {
-        await w.tap('a[href="/crm/productos/etiquetas"]')
-        await w.wait('[data-etq-search]')
         await w.type('[data-etq-search]', data.query)
         await w.wait('[data-etq-results] li button')
       },
@@ -36,15 +46,19 @@ export default {
         { ring: '[data-etq-search]', n: 2, shape: 'box', pad: 4 },
         { ring: `[data-etq-results] li button:has-text("${data.item_name}")`, n: 3, shape: 'box', pad: 3 },
       ],
+      // «Toca el producto»: under this caption, not the next one.
+      async after(w, data) {
+        await w.tap(`[data-etq-results] li button:has-text("${data.item_name}")`)
+        await w.wait('[data-etq-row]')
+      },
     },
     {
       text: 'Queda en **Por imprimir**. Con **−** y **+** [[4]] eliges cuántas etiquetas salen de ese producto.',
       caption: 'Elige cuántas etiquetas salen',
       async action(w, data) {
-        await w.tap(`[data-etq-results] li button:has-text("${data.item_name}")`)
-        await w.wait('[data-etq-row]')
         await w.tap(`button[aria-label="Una copia más de ${data.item_name}"]`)
-        await w.show('[data-etq-rows]')
+        // The whole row, clear of both sticky bars, with no control cut under the header.
+        await w.show(`[data-etq-row]:has(button[aria-label="Una copia más de ${data.item_name}"])`)
       },
       ready: '[data-etq-row]',
       marks: (data) => [
@@ -54,8 +68,9 @@ export default {
     {
       text: 'Así sale tu etiqueta [[5]]: nombre, precio y código. En **Diseño** [[6]] cambias la medida y lo que lleva.',
       caption: 'Revisa cómo sale; en «Diseño» cambias la medida',
+      // Both marked boxes whole under the header, reached at a steady glide.
       async action(w) {
-        await w.page.locator('[data-etiquetas]').evaluate(el => el.scrollTo({ top: 0, behavior: 'instant' }))
+        await w.reveal(['[data-etq-preview] > :first-child', '[data-etq-layout]'])
       },
       ready: '[data-etq-layout]',
       marks: [
@@ -66,8 +81,10 @@ export default {
     {
       text: 'Toca **Imprimir** [[7]] y elige tu impresora de etiquetas. Si imprime otra persona, **Compartir PDF** [[8]] se lo manda.',
       caption: 'Toca «Imprimir» o comparte el PDF',
+      // The last row whole above the sticky print bar, nothing cut under the header.
       async action(w) {
         await w.wait('[data-etq-print]')
+        await w.reveal(w.page.locator('[data-etq-row]').last())
       },
       ready: '[data-etq-print] button[aria-label^="Imprimir"]',
       marks: [

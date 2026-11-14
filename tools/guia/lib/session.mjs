@@ -16,15 +16,31 @@ export const SECRET_FILE = process.env.GUIA_SECRET_FILE || path.join(os.homedir(
 export const REFUSED_SITES = ['mumu-mirror', 'demo', 'clinica']
 
 /**
- * Screen sizes. `scale` is the device pixel ratio of the stills; videos use
- * the `video` viewport so the screen fits the 1080×1920 canvas with room for
- * the question and the caption.
+ * Screen sizes and device pixel ratio. Stills and video use the same one, so
+ * both show the same screen in the same state (a bar that fits one height and
+ * not the other would differ between them); the video scales it into the
+ * 1080×1920 canvas.
  */
 export const FORMATS = {
-  phone: { viewport: { width: 412, height: 915 }, scale: 2, mobile: true, video: { width: 412, height: 700, scale: 2.1 } },
-  desktop: { viewport: { width: 1280, height: 800 }, scale: 1.25, mobile: false, video: { width: 1280, height: 720, scale: 1.25 } },
-  'desktop-wide': { viewport: { width: 1440, height: 900 }, scale: 1.25, mobile: false, video: { width: 1440, height: 810, scale: 1.25 } },
+  phone: { viewport: { width: 412, height: 915 }, scale: 2, mobile: true },
+  desktop: { viewport: { width: 1280, height: 800 }, scale: 1.25, mobile: false },
+  'desktop-wide': { viewport: { width: 1440, height: 900 }, scale: 1.25, mobile: false },
 }
+
+/** The capture-only stylesheet (capture.css): counts and notices that are not the guide's screen. */
+export const CAPTURE_CSS = fs.readFileSync(new URL('./capture.css', import.meta.url), 'utf8')
+
+// Installs CAPTURE_CSS in every frame, srcdoc previews included, before the app paints.
+export const CAPTURE_SCRIPT = `(() => {
+  const css = ${JSON.stringify(CAPTURE_CSS)};
+  const add = () => {
+    if (document.getElementById('guia-capture-css')) return;
+    const s = document.createElement('style'); s.id = 'guia-capture-css'; s.textContent = css;
+    (document.head || document.documentElement).appendChild(s);
+  };
+  if (document.documentElement) add(); else addEventListener('DOMContentLoaded', add);
+  addEventListener('DOMContentLoaded', add);
+})();`
 
 const PHONE_AGENT = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36'
 
@@ -95,35 +111,87 @@ export const MASK_SCRIPT = `(() => {
   if (document.body) start(); else addEventListener('DOMContentLoaded', start);
 })();`
 
-// Video only: a dot where the finger lands and a ring on press.
+/** The longest a tap's ring stays on screen (ms): it never outlives the tap's own screen. */
+export const RING_MS = 350
+
+/**
+ * Whether a tap's ring must go now (pure: tested, and inlined in TOUCH_SCRIPT).
+ * It ends at RING_MS, or as soon as the tapped control leaves: off the page,
+ * moved or resized by more than a pixel (a row that slides up), fading out or
+ * no longer what is under the finger (a list closing with a leave transition
+ * while the next controls slide in under it). The ring marks a control, never
+ * the screen that replaced it.
+ */
+export function ringEnds({ elapsed, connected, from, to, shown = true }, cap = RING_MS) {
+  if (elapsed >= cap || !connected || !shown || !from || !to) return true
+  return Math.abs(to.x - from.x) > 1 || Math.abs(to.y - from.y) > 1 || Math.abs(to.width - from.width) > 1 || Math.abs(to.height - from.height) > 1
+}
+
+// Video only: a dot where the finger lands and a ring on press. The ring is
+// watched every frame (ringEnds) and removed with its control's change;
+// window.__guiaTouchIdle() says when neither shows, so a tap ends only then.
 export const TOUCH_SCRIPT = `(() => {
   if (window.__guiaTouch) return; window.__guiaTouch = true;
+  const RING_MS = ${RING_MS};
+  const ringEnds = ${ringEnds.toString()};
   const css = '.guia-dot{position:fixed;z-index:2147483646;pointer-events:none;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:rgba(255,90,31,.28);border:3px solid rgba(255,255,255,.95);box-shadow:0 2px 10px rgba(0,0,0,.35);transition:opacity .25s,transform .25s;opacity:0;transform:scale(.6)}'
-    + '.guia-ring{position:fixed;z-index:2147483646;pointer-events:none;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;border:3px solid rgba(255,90,31,.9);animation:guia-ring .5s ease-out forwards}'
+    + '.guia-ring{position:fixed;z-index:2147483646;pointer-events:none;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;border:3px solid rgba(255,90,31,.9);animation:guia-ring ' + RING_MS + 'ms ease-out forwards}'
     + '@keyframes guia-ring{from{transform:scale(.6);opacity:1}to{transform:scale(1.9);opacity:0}}';
   const add = () => { const s = document.createElement('style'); s.textContent = css; document.documentElement.appendChild(s); };
   if (document.documentElement) add(); else addEventListener('DOMContentLoaded', add);
   let dot;
+  let dotUntil = 0;
+  const rings = new Set();
   window.__guiaDot = (x, y) => {
     if (!dot || !dot.isConnected) { dot = document.createElement('div'); dot.className = 'guia-dot'; document.body.appendChild(dot); }
     dot.style.left = x + 'px'; dot.style.top = y + 'px';
     requestAnimationFrame(() => { dot.style.opacity = '1'; dot.style.transform = 'scale(1)'; });
   };
-  window.__guiaDotOff = () => { if (dot) { dot.style.opacity = '0'; dot.style.transform = 'scale(.6)'; } };
+  window.__guiaDotOff = () => { if (dot) { dot.style.opacity = '0'; dot.style.transform = 'scale(.6)'; dotUntil = performance.now() + 260; } };
+  window.__guiaTouchIdle = () => !rings.size && performance.now() >= dotUntil;
+  const box = (el) => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; };
+  // The tapped control, not the label span inside it.
+  const control = (el) => el.closest('button, a, input, select, textarea, label, [role="button"], [role="option"], li') || el;
+  const opacity = (el) => { let o = 1; for (let n = el; n && n.nodeType === 1; n = n.parentElement) o *= +getComputedStyle(n).opacity; return o; };
+  // Still showing and still what the finger is on: not fading out, not covered.
+  const shown = (el, x, y) => {
+    if (opacity(el) < 0.9) return false;
+    const hit = document.elementFromPoint(x, y);
+    return !!hit && (el.contains(hit) || hit.contains(el));
+  };
   addEventListener('pointerdown', (e) => {
     const r = document.createElement('div'); r.className = 'guia-ring';
     r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px';
-    document.body.appendChild(r); setTimeout(() => r.remove(), 600);
+    document.body.appendChild(r); rings.add(r);
+    const el = e.target instanceof Element ? control(e.target) : null;
+    const from = el ? box(el) : null;
+    const x = e.clientX; const y = e.clientY;
+    const t0 = performance.now();
+    const end = () => { r.remove(); rings.delete(r); };
+    const watch = () => {
+      if (!rings.has(r)) return;
+      const connected = !!el && el.isConnected;
+      const state = { elapsed: performance.now() - t0, connected, from, to: connected ? box(el) : null, shown: connected && shown(el, x, y) };
+      if (ringEnds(state, RING_MS)) {
+        end();
+        // The control left before the cap: the finger's dot goes with it, no fade over the new screen.
+        if (state.elapsed < RING_MS && dot) { dot.style.transition = 'none'; dot.style.opacity = '0'; dot.style.transform = 'scale(.6)'; requestAnimationFrame(() => { dot.style.transition = ''; }); }
+      } else requestAnimationFrame(watch);
+    };
+    requestAnimationFrame(watch);
+    // A backstop for a hidden tab, where frames stop.
+    setTimeout(end, RING_MS);
   }, true);
 })();`
 
 /**
- * A browser context at the guide's format, logged in. `video` picks the
- * video viewport and adds the touch dot.
+ * A browser context at the guide's format, logged in, with the capture
+ * stylesheet and the phone-number mask. `video` adds the touch dot only; the
+ * viewport is the stills' one.
  */
 export async function openSession(browser, { base, user, password, format, video = false }) {
   const f = FORMATS[format]
-  const size = video ? f.video : { ...f.viewport, scale: f.scale }
+  const size = { ...f.viewport, scale: f.scale }
   const context = await browser.newContext({
     viewport: { width: size.width, height: size.height },
     deviceScaleFactor: size.scale,
@@ -132,6 +200,7 @@ export async function openSession(browser, { base, user, password, format, video
     serviceWorkers: 'block',
     ...(f.mobile ? { userAgent: PHONE_AGENT, isMobile: true, hasTouch: true } : {}),
   })
+  await context.addInitScript(CAPTURE_SCRIPT)
   await context.addInitScript(MASK_SCRIPT)
   if (video) await context.addInitScript(TOUCH_SCRIPT)
   const answer = await context.request.post(`${base}/api/method/login`, { form: { usr: user, pwd: password }, failOnStatusCode: false })

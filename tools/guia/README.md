@@ -54,9 +54,78 @@ link: those are limited to a few per hour and burn out on repeated walks.
 A guide names a fixture (`fixtures/<name>.mjs`). Fixtures only read the site
 (GET with the bot's session) and return the data the steps use (which product
 to search) plus `rename` pairs: every company and Mercado shop name on the
-site is swapped for «Tu empresa» / «Tu tienda» on screen, label previews in
-srcdoc frames included, before each shot and every 200 ms while recording.
+site is swapped for «Tu empresa» / «Tu tienda». The swap happens first in
+the data: the capture context routes every `/api/` JSON answer of the site
+through `lib/rewrite.mjs` (tested), so the app draws the demo word from its
+first paint (the labels service's `bootstrap` carries the shop in
+`message.design.shop`, its `preview` in the label HTML of `message.html`).
+An init script in every frame then swaps whatever still reaches the screen,
+label previews in srcdoc frames included. Fixture reads go through
+`context.request`, which routes skip, so fixtures still see the real names.
 Phone numbers and IMEIs keep only their last four digits (the walk.mjs mask).
+
+A fixture also picks the search the steps use (`data.query`) so that it only
+finds clean demo rows: `catalogo-con-precio` takes the shortest start of the
+product's name whose matches all have a price and a tidy name (no «Sin
+precio», no price in the name, no doubled spaces, all caps or stuck keys), and
+the guide filters the product list with it (`route` may be a function of the
+data). Prefer that over seeding data; if a site has nothing clean, seed one
+named demo product on a lab site only, never on prod.
+
+Photos cannot be renamed: a product photo with a store's logo, a shelf
+sticker, a person or a name is a defect no mask fixes. The Productos list
+searches looser than the Item name filter (word stems, the item group), so
+`catalogo-con-precio` also picks `data.listQuery` for it: the item's whole
+name, else its code, whose rows in the page's own read
+(`doco.workspaces.products.queue`) are at most four, include the item, and
+show no photo or only photos on `PHOTOS_CHECKED` (tested). A code goes on
+`PHOTOS_CHECKED` only after someone opened its thumbnail and looked at it.
+On doco-mirror «Funda Brillos Universal» lists one row, the item, with the
+app's initials placeholder; «Funda Brillos» listed twelve, seven with
+photos, two of them branded.
+
+### Capture rules
+
+- **No counts, no notices.** `lib/capture.css` is loaded into every frame of
+  `shoot` and `video` before the app paints, and never ships with the app. It
+  hides what belongs to the capture account or the lab and not to the screen
+  the guide shows: the Avisos bell's red count, red count pills in the shell's
+  header, rail and bottom bar, and the Mi cuenta notice. A badge or banner in a
+  guide is a defect; hide it here rather than writing to the lab. An app can
+  mark its own capture-noise with `data-guia-hide`.
+- **Same screen in stills and video.** Both use the format's one viewport and
+  device scale; the video scales it into the canvas. Every step ends the same
+  way in both (`runStep`): its `ready` selector, no request in flight for
+  700 ms, none of the guide's `busy` texts on screen («Buscando», «Dibujando
+  las etiquetas»), then `ready` again. The video's first screen settles the
+  same way before recording starts.
+- **The finger lands where the step acts.** A tap waits until the control
+  stops moving (restored scrolls, rows scrolling themselves into view), puts
+  the dot there and presses at that exact point, so the ripple is on the
+  control.
+- **A tap's ring goes with its control.** The video's ripple lasts at most
+  350 ms (`RING_MS`) and is watched every frame: it ends at once when the
+  tapped control leaves the page, moves, fades out or is no longer under the
+  finger (`ringEnds`, tested), and the finger's dot goes with it. A tap
+  returns only when neither shows, so no ring is on screen when the next
+  caption starts.
+- **Numbers clear everything.** Each mark's number sits outside its loop: the
+  `nAt` side first, then the other corners, the sides, and above or below its
+  ends. It takes the first place on screen that touches no other loop, ripple
+  or number and no word, icon, card border or bar edge on the page, with
+  at least 4 px of air (`lib/bubbles.mjs`, tested). A number never sits nearer another control (a search field, a button)
+  than its own loop.
+- **A tap plays under its own caption.** The tap a step's text asks for
+  («toca Etiquetas», «tócalo») goes in the step's `after`: it runs after the
+  shot, and in the video after the marks and before the next caption starts.
+  The step ends as soon as `after` sees its result (the new page's field, the
+  picked row), so the next caption takes over with the screen it describes.
+- **Scrolls are small and steady.** `w.reveal(targets)` and every tap scroll
+  only as far as it takes to show the targets whole between the sticky
+  header and the bottom bar, without leaving a control cut by either
+  (`lib/scroll.mjs`, tested). When the targets already show whole between
+  the bars (within 4 px) the page does not move at all; the video glides there at one pace, inside the
+  step's action, before it settles.
 
 ## A guide
 
@@ -85,11 +154,13 @@ export default {
 }
 ```
 
-- `text`, `caption`, `ready`, `marks` may be functions of the fixture data.
+- `text`, `caption`, `route`, `ready`, `busy`, `marks` may be functions of the
+  fixture data. `busy` (guide or step): texts no shot or step end may show.
 - The walker `w` has `goto`, `wait`, `tap`, `tapText`, `type`, `press`, `show`,
   `locator`, `byText`; `shoot` and `video` run the same steps (the video shows
   the finger and types slowly).
-- Marks: `{ ring, n, shape: 'oval'|'box', pad, nAt: 'tl'|'tr'|'l' }`,
+- Marks: `{ ring, n, shape: 'oval'|'box', pad, nAt: 'tl'|'tr'|'br'|'bl'|'l'|'r'|'t'|'b' }`
+  (`nAt` is the side the number tries first),
   `{ tap }`, `{ note: 'Toca aquí', to }`, `{ spot: [...] }`. A target is a
   Playwright selector (first visible match) or a list (one loop around all).
   Every `[[n]]` in the text needs a mark `n`; `shoot` reports the ones missing.

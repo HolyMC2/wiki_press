@@ -7,7 +7,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { FORMATS, openSession, readSecret, siteBase, checkSite, loadPlaywright } from './session.mjs'
 import { resolveFixture } from './fixtures.mjs'
-import { walker, runStep, applyRename } from './walker.mjs'
+import { walker, runStep, finishStep, applyRename, installRename } from './walker.mjs'
+import { installResponseRename } from './rewrite.mjs'
 import { drawMarks, clearMarks } from './marks.mjs'
 import { framePhone } from './frame.mjs'
 import { collectProbes, classify } from './probes.mjs'
@@ -30,13 +31,15 @@ export async function shoot(guide, { out, site, fixtures, log = console.log }) {
   try {
     const { context, page, errors, size } = await openSession(browser, { base, user: secret.user, password: secret.password, format: guide.format })
     const { data, rename } = await resolveFixture(fixtures, guide.fixture, { context, base, args: guide.fixtureArgs || {} })
+    await installResponseRename(context, base, rename)
+    await installRename(context, rename)
     log(`sitio ${siteLabel}, fixture ${guide.fixture}: ${Object.keys(data).join(', ') || 'sin datos'}; ${rename.length} nombre(s) reemplazado(s)`)
     const w = walker(page, base)
     for (const [index, step] of guide.steps.entries()) {
       const name = imageName(guide, index)
       try {
         errors.length = 0
-        await runStep(w, step, data)
+        await runStep(w, step, data, { busy: guide.busy })
         await applyRename(page, rename)
         await page.waitForTimeout(150)
         const raw = await collectProbes(page)
@@ -55,6 +58,7 @@ export async function shoot(guide, { out, site, fixtures, log = console.log }) {
         fs.writeFileSync(path.join(dirs.shots, name), framed)
         shots.push({ step: index + 1, image: name, text, caption: resolve(step.caption, data) || plainText(text), path: raw.path, defects, texts: raw.texts })
         log(`  ${index + 1}. ${name}${defects.length ? `  (${defects.length} hallazgo(s))` : ''}`)
+        await finishStep(w, step, data)
       } catch (error) {
         failed = `paso ${index + 1}: ${error.message.split('\n')[0]}`
         await page.screenshot({ path: path.join(dirs.root, 'error.png') }).catch(() => {})

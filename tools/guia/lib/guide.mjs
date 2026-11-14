@@ -14,9 +14,11 @@
  *     steps: [{
  *       text: '[[1]] Abre …',                one action; [[n]] matches mark n
  *       caption: 'Abre …',                   video caption (default: text without marks)
- *       route: '/crm/…',                     go here first (optional)
+ *       route: '/crm/…',                     go here first (optional; may be a function of the data)
  *       ready: '[data-x]',                   wait for this before the shot
+ *       busy: ['Cargando'],                  texts that must be gone before the shot (plus the guide's)
  *       action: async (w, data) => {},       walker actions (optional)
+ *       after: async (w, data) => {},        the tap the text asks for, after the shot (video: under this caption)
  *       marks: [{ ring: '[aria-label=…]', n: 1 }, { note: '…', to: '…' }],
  *       settle: 450,                         ms after ready, before the shot
  *     }],
@@ -24,9 +26,10 @@
  *     asistente: '¿…?',                      what to ask the assistant
  *     help: [{ context_type, context_key }], Wiki Help Mapping rows
  *     allowEnglish: ['…'],                   words the English probe may ignore
+ *     busy: ['Buscando', '…'],               in-between texts every step waits out
  *   }
  *
- * `marks`, `text` and `caption` may be functions of the fixture data.
+ * `marks`, `text`, `caption`, `route`, `ready` and `busy` may be functions of the fixture data.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -59,9 +62,10 @@ export function validateGuide(guide, { area, slug } = {}) {
     const at = `paso ${index + 1}`
     need(typeof step.text === 'string' || typeof step.text === 'function', `${at}: falta text`)
     need(step.route || step.action, `${at}: necesita route o action`)
-    if (step.route) need(typeof step.route === 'string' && step.route.startsWith('/'), `${at}: route empieza con /`)
+    if (step.route) need(typeof step.route === 'function' || (typeof step.route === 'string' && step.route.startsWith('/')), `${at}: route empieza con / (o es una función de los datos)`)
     if (typeof step.route === 'string') need(!/^\/app(\/|$)/.test(step.route), `${at}: lleva a Desk (/app); las guías van por la app`)
     if (step.action) need(typeof step.action === 'function', `${at}: action es una función (w, data)`)
+    if (step.after !== undefined) need(typeof step.after === 'function', `${at}: after es una función (w, data)`)
     if (Array.isArray(step.marks)) {
       for (const mark of step.marks) {
         const unknown = Object.keys(mark).filter(key => !MARK_KEYS.has(key))
@@ -73,6 +77,7 @@ export function validateGuide(guide, { area, slug } = {}) {
     }
     if (typeof step.text === 'string') need(!DOCTYPE_WORDS.test(step.text), `${at}: usa el nombre del botón, no el del documento de ERPNext`)
   }
+  if (guide.busy !== undefined) need(Array.isArray(guide.busy) && guide.busy.every(text => typeof text === 'string' && text), 'busy: lista de textos')
   if (guide.ysi !== undefined) {
     need(Array.isArray(guide.ysi) && guide.ysi.every(pair => Array.isArray(pair) && pair.length === 2), 'ysi: pares [pregunta, respuesta]')
   }

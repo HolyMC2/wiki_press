@@ -1,0 +1,20 @@
+/*
+ * Capture-only stylesheet: loaded into every frame of `shoot` and `video`,
+ * never shipped with the app. It hides what belongs to the capture account or
+ * the lab site and not to the screen the guide shows: notification counts and
+ * account or lab notices. A guide shot with a red count or a banner on it is a
+ * defect; hiding it here keeps the lab untouched.
+ */
+
+/* Avisos bell: its unread count (AvisosBell.vue). */
+button:has(> .lucide-bell) > .bg-surface-red-7,
+/* Any red count pill in the shell's header, rail or bottom bar. */
+[data-testid="shell-header"] .rounded-full.bg-surface-red-7,
+[data-testid="shell-command-bar"] .rounded-full.bg-surface-red-7,
+nav .rounded-full.bg-surface-red-7,
+/* Mi cuenta's notice (invoice past due, suspension) for the lab's plan. */
+[data-testid="shell-cuenta-aviso"],
+/* Escape hatch for an app that marks its own capture-noise. */
+[data-guia-hide] {
+  display: none !important;
+}
