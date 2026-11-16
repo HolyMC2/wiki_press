@@ -1,13 +1,17 @@
 /**
- * `guia build`: wiki markdown, manifest.json, help-mapping rows and the
- * playbook stub, from the guide and its last shoot (and video, if made).
+ * `guia build`: wiki markdown, manifest.json, help-mapping rows, the bot
+ * playbook (a stub, or only the marker for a guide an existing playbook
+ * answers) and the in-app card, from the guide and its last shoot (and video,
+ * if made). `doco` (a doco checkout) also copies the card into it.
  */
 import fs from 'node:fs'
 import path from 'node:path'
 import { guideDirs, ensure, readJson, writeJson, videoName, posterName } from './paths.mjs'
-import { pageMarkdown, manifestEntry, helpRows, playbookStub, mergePlaybook } from './render.mjs'
+import { pageMarkdown, manifestEntry, helpRows, playbookStub, mergePlaybook, playbookMarker } from './render.mjs'
+import { renderCard, writeCard, copyToDoco } from './card.mjs'
+import { loadManual } from './manual.mjs'
 
-export function build(guide, { out, log = console.log }) {
+export async function build(guide, { out, manuales, doco, log = console.log }) {
   const dirs = guideDirs(out, guide)
   const shot = readJson(dirs.shotsJson, null)
   if (!shot) throw new Error(`no hay fotos de ${guide.area}/${guide.slug}: corre guia shoot primero`)
@@ -33,11 +37,22 @@ export function build(guide, { out, log = console.log }) {
   const help = helpRows(resolved)
   writeJson(path.join(dirs.build, 'help-mapping.json'), help.rows)
   if (help.pending.length) writeJson(path.join(dirs.build, 'help-mapping-pendiente.json'), help.pending)
-  const playbookFile = path.join(ensure(path.join(dirs.build, 'playbook')), `${guide.slug}.md`)
-  const existing = guide.playbookPath && fs.existsSync(guide.playbookPath) ? fs.readFileSync(guide.playbookPath, 'utf8') : null
-  fs.writeFileSync(playbookFile, mergePlaybook(playbookStub(resolved, media), existing))
+  const playbookDir = ensure(path.join(dirs.build, 'playbook'))
+  if (guide.playbook) {
+    // An existing playbook answers this job: it only gets the guide's marker line
+    // (marker lines do not count against the guide body's size limit in doco).
+    fs.writeFileSync(path.join(playbookDir, `${guide.playbook}.marker`), `${playbookMarker(guide)}\n`)
+  } else {
+    const existing = guide.playbookPath && fs.existsSync(guide.playbookPath) ? fs.readFileSync(guide.playbookPath, 'utf8') : null
+    fs.writeFileSync(path.join(playbookDir, `${guide.slug}.md`), mergePlaybook(playbookStub(resolved, media), existing))
+  }
+  const manual = guide.manual ? await loadManual(manuales, guide.manual) : null
+  const card = renderCard(guide, { shots: shot.shots, manual })
+  const cardDir = path.join(dirs.build, 'manual')
+  writeCard(card, { dir: cardDir, shotsDir: dirs.shots, images })
   log(`página: ${path.join(dirs.build, `${guide.slug}.md`)}`)
-  log(`manifest, help-mapping.json, playbook/${guide.slug}.md en ${dirs.build}`)
+  log(`manifest, help-mapping.json, playbook/${guide.playbook ? `${guide.playbook}.marker` : `${guide.slug}.md`}, manual/${card.key}.json en ${dirs.build}`)
+  if (doco) log(`tarjeta en doco: ${copyToDoco(cardDir, card, doco)}`)
   if (!video) log('sin video: corre guia video y vuelve a correr build para incluirlo')
-  return { dirs, media }
+  return { dirs, media, card }
 }

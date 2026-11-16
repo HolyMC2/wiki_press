@@ -5,20 +5,19 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { FORMATS, openSession, readSecret, siteBase, checkSite, loadPlaywright } from './session.mjs'
+import { FORMATS, openSession, readSecret, walkBase, loadPlaywright } from './session.mjs'
 import { resolveFixture } from './fixtures.mjs'
 import { walker, runStep, finishStep, applyRename, installRename } from './walker.mjs'
-import { installResponseRename } from './rewrite.mjs'
-import { drawMarks, clearMarks } from './marks.mjs'
+import { installResponseRename, installAnswers } from './rewrite.mjs'
+import { drawMarks, clearMarks, offscreenMarks } from './marks.mjs'
 import { framePhone } from './frame.mjs'
 import { collectProbes, classify } from './probes.mjs'
 import { markNumbers, plainText, resolve } from './guide.mjs'
 import { guideDirs, imageName, ensure, writeJson } from './paths.mjs'
 
-export async function shoot(guide, { out, site, fixtures, log = console.log }) {
+export async function shoot(guide, { out, site, base: preview, fixtures, log = console.log }) {
   const secret = readSecret()
-  const base = siteBase(secret.base, site)
-  const siteLabel = checkSite(base)
+  const { base, label: siteLabel } = walkBase(secret, { site, base: preview })
   const dirs = guideDirs(out, guide)
   for (const dir of [dirs.shots, dirs.raw]) {
     fs.rmSync(dir, { recursive: true, force: true })
@@ -30,8 +29,9 @@ export async function shoot(guide, { out, site, fixtures, log = console.log }) {
   let failed = null
   try {
     const { context, page, errors, size } = await openSession(browser, { base, user: secret.user, password: secret.password, format: guide.format })
-    const { data, rename } = await resolveFixture(fixtures, guide.fixture, { context, base, args: guide.fixtureArgs || {} })
+    const { data, rename, answers } = await resolveFixture(fixtures, guide.fixture, { context, base, args: guide.fixtureArgs || {} })
     await installResponseRename(context, base, rename)
+    await installAnswers(context, base, answers, rename)
     await installRename(context, rename)
     log(`sitio ${siteLabel}, fixture ${guide.fixture}: ${Object.keys(data).join(', ') || 'sin datos'}; ${rename.length} nombre(s) reemplazado(s)`)
     const w = walker(page, base)
@@ -50,7 +50,8 @@ export async function shoot(guide, { out, site, fixtures, log = console.log }) {
         const numbers = markNumbers(text, marks)
         for (const n of numbers.missing) defects.push({ kind: 'marca', blocks: true, text: `el texto cita [[${n}]] y la foto no la dibuja` })
         for (const n of numbers.unexplained) defects.push({ kind: 'marca', blocks: false, text: `la foto dibuja ${n} y el texto no la cita` })
-        await drawMarks(page, marks, { seed: 11 + index })
+        const drawn = await drawMarks(page, marks, { seed: 11 + index })
+        for (const n of offscreenMarks(drawn, size)) defects.push({ kind: 'marca', blocks: true, text: `la marca ${n} queda fuera de la pantalla: el paso tiene que mostrarla (w.reveal) antes de la foto` })
         const png = await page.screenshot()
         await clearMarks(page)
         fs.writeFileSync(path.join(dirs.raw, name), png)

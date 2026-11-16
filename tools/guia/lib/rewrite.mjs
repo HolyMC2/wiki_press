@@ -97,3 +97,44 @@ export async function installResponseRename(context, base, pairs) {
     return route.fulfill({ response, headers, body: next })
   })
 }
+
+/** `crm.api.bancos.cuentas` from `/api/method/crm.api.bancos.cuentas`, else ''. */
+export const methodOf = (url) => (/^\/api\/method\/([\w.]+)/.exec(new URL(url).pathname) || [])[1] || ''
+
+/** A call's arguments: the query string, then a JSON or form body (frappe-ui posts JSON). */
+export function requestParams(url, body = '', type = '') {
+  const params = Object.fromEntries(new URL(url).searchParams)
+  if (!body) return params
+  if (/json/i.test(type)) {
+    try {
+      return { ...params, ...JSON.parse(body) }
+    } catch {
+      return params
+    }
+  }
+  return { ...params, ...Object.fromEntries(new URLSearchParams(body)) }
+}
+
+/**
+ * Demo answers: a fixture's `answers` ({ method: async (params, real) => message })
+ * replace the site's answer to those methods for the whole walk, so a guide
+ * over money, people or anything else a mirror holds for real shows invented
+ * data in the app's real screens. `real()` fetches the site's own answer when
+ * the demo keeps part of it (the company, the permissions). The answer is
+ * renamed like every other one; the fixture never writes to the site.
+ */
+export async function installAnswers(context, base, answers, pairs) {
+  const methods = new Set(Object.keys(answers || {}))
+  if (!methods.size) return
+  const expanded = expandPairs(pairs)
+  await context.route((url) => isApiUrl(url.href, base) && methods.has(methodOf(url.href)), async (route) => {
+    const request = route.request()
+    const params = requestParams(request.url(), request.postData() || '', request.headers()['content-type'] || '')
+    const real = async () => {
+      const response = await route.fetch()
+      return (await response.json()).message
+    }
+    const message = await answers[methodOf(request.url())](params, real)
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rewriteJson({ message }, expanded)) })
+  })
+}

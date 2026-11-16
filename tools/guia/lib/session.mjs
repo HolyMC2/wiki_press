@@ -66,6 +66,22 @@ export function siteBase(secretBase, site) {
   return `${base.protocol}//${site}.${rest}`
 }
 
+/**
+ * Where to walk: a lab site by its label, or (`--base`) a local preview such as
+ * a lane's live preview (shell-program/scripts/live-preview.sh), which proxies
+ * a lab site and serves the lane's own screens before they land. Only
+ * localhost: a guide never walks an arbitrary host with the bot's password.
+ */
+export function walkBase(secret, { site, base } = {}) {
+  if (!base) {
+    const url = siteBase(secret.base, site)
+    return { base: url, label: checkSite(url) }
+  }
+  const url = new URL(base)
+  if (!['localhost', '127.0.0.1'].includes(url.hostname)) throw new Error(`--base solo acepta una vista previa local (localhost), no «${url.hostname}»`)
+  return { base: url.origin, label: `vista previa ${url.host}` }
+}
+
 export function checkSite(base) {
   const label = new URL(base).hostname.split('.')[0]
   if (REFUSED_SITES.includes(label)) throw new Error(`el sitio «${label}» está en cuarentena para guías; usa doco-mirror o lab`)

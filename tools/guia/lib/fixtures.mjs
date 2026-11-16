@@ -6,7 +6,10 @@
  * `get(method, args)` is a GET on the site with the bot's session: fixtures
  * read what the site already has and never write. `data` goes to the steps
  * (what to search, which product); `rename` is a list of [real, demo] pairs
- * swapped on screen so no company or store name reaches public media.
+ * swapped on screen so no company or store name reaches public media;
+ * `answers` ({ method: async (params, real) => message }) answer those calls
+ * with invented data for the whole walk (rewrite.mjs installAnswers), for
+ * screens whose real data must never be shown (a mirror's bank movements).
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -25,7 +28,7 @@ export async function resolveFixture(dir, name, { context, base, args = {} }) {
   const fixture = await loadFixture(dir, name)
   const get = (method, params) => apiGet(context, base, method, params)
   const out = (await fixture.resolve({ get, args })) || {}
-  return { data: out.data || {}, rename: (out.rename || []).filter(([from, to]) => from && from !== to) }
+  return { data: out.data || {}, rename: (out.rename || []).filter(([from, to]) => from && from !== to), answers: out.answers || {} }
 }
 
 /** Company and store names on the site → demo words. Shared by fixtures. */

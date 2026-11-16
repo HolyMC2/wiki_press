@@ -25,6 +25,8 @@ heavy -- node tools/guia/guia.mjs video    inventario/imprimir-etiquetas --site 
 heavy -- node tools/guia/guia.mjs critique inventario/imprimir-etiquetas
 node tools/guia/guia.mjs build    inventario/imprimir-etiquetas
 heavy -- node tools/guia/guia.mjs all      inventario/imprimir-etiquetas --site doco-mirror
+node tools/guia/guia.mjs build    bancos/por-que-no-cuadra --doco ~/muelle-host/worktrees/<lane>/doco
+heavy -- node tools/guia/guia.mjs manual bancos --para dueno     # equipo | dueno | soporte
 node --test 'tools/guia/test/*.test.mjs'
 ```
 
@@ -33,10 +35,13 @@ node --test 'tools/guia/test/*.test.mjs'
 | `shoot` | `shots/<area>-<slug>-NN.png` (whole screen, framed in a phone for phone guides), `raw/` (unframed), `shots.json` (texts, captions, probes, defects) |
 | `video` | `video/<area>-<slug>.mp4` (1080×1920, H.264 High, yuv420p, faststart, silent, ≤16 MB), `video/<area>-<slug>-video.png` (poster), `video/cuadros/` (last frame of each step), `video/timeline.json` |
 | `critique` | `critique/contact-sheet.png` (every shot and video step with its findings), `critique/DEFECTS.md`; exits 1 when something blocks publishing |
-| `build` | `build/<slug>.md` (wiki page), the images, video and poster, `manifest.json`, `help-mapping.json`, `help-mapping-pendiente.json` (types the DocType does not accept yet), `playbook/<slug>.md` |
+| `build` | `build/<slug>.md` (wiki page), the images, video and poster, `manifest.json`, `help-mapping.json`, `help-mapping-pendiente.json` (types the DocType does not accept yet), `playbook/<slug>.md` (or `playbook/<name>.marker` when an existing playbook answers the job), `manual/<key>.json` + `manual/fotos/*.webp` (the in-app card; `--doco` copies it into doco `manual/guias/` and `manual/fotos/`) |
+| `manual <manual> --para <audiencia>` | `<out>/manuales/<manual>/<manual>-<audiencia>.{html,pdf}`: the app's guides by level, one job per page; refuses a guide without a full shoot or whose critique blocks |
 
 Options: `--site <first DNS label of a lab site>` (default: the site of the bot
-secret), `--out <dir>` (default `$GUIA_OUT` or `<repo>/.scratch/guia`, which
+secret), `--base <http://localhost:PORT>` (a lane's live preview,
+`shell-program/scripts/live-preview.sh`, which serves the lane's own screens
+over a lab site before they land; only localhost), `--out <dir>` (default `$GUIA_OUT` or `<repo>/.scratch/guia`, which
 git ignores), `--guides <dir>`, `--fixtures <dir>`. Guides may live in the repo
 that owns the screen (`docs/manual/<area>/`) and be pointed at with `--guides`.
 
@@ -172,11 +177,42 @@ export default {
 - `check` refuses Desk routes (`/app`), more than 8 steps, ERPNext document
   names in the text and unknown mark keys.
 
+## Manuals: levels and audiences (guías program PLAN §12)
+
+A guide that belongs to an app's manual says so with `manual` (the app's
+manual id) and `nivel`: 1 lo básico, 2 el día a día, 3 cuando algo sale mal,
+4 para el encargado o dueño. The index `manuales/<manual>.manual.mjs` gives the
+title, one sentence on what the app is for, and per level one line on what
+the reader learns and the guides in order; `guia manual` refuses an index and
+guides that disagree. The audience (`--para`) picks guides by their `quien`:
+`equipo` (cajero, vendedor, mostrador, técnico; levels 1–3), `dueno` (dueño,
+encargado, contador; 1–4), `soporte` (everyone, plus each guide's `soporte`
+lines). Muelle's technical team reads the knowledge archive
+(`~/muelle-host/conocimiento/apps/<app>.md`), found through each guide's
+`tecnico: '<repo>/<path>'`; this tool writes nothing for it.
+
+The same shoot gives the three forms: the in-app card (`build`, doco's
+«Empezar con plantillas», grouped by the manual's title, readers mapped to
+doco puestos), the PDF (`manual`) and the bot's answer (`build`: a playbook
+stub, or only the `<!-- guia: … -->` marker for `playbook: '<name>'`).
+
+### Demo answers
+
+A fixture may return `answers: { '<method>': async (params, real) => message }`.
+Those calls are answered with that message for the whole walk (renamed like
+every other answer); `real()` fetches the site's own answer when the demo
+keeps part of it. Use it for screens whose real data must never be public: a
+mirror's bank movements and balances (`fixtures/banco-demo.mjs`, whose
+numbers add up and whose dates count back from today in the shop's zone).
+The screens stay the app's real code.
+
 ## What the critique probes
 
-On every shot, before the marks: floating toasts and alerts, English words,
+On every shot, before the marks: floating toasts and alerts (a status line
+inside a dialog or bottom sheet is part of it, not a toast), English words,
 text cut with an ellipsis or a line clamp, page overflow, broken images,
-loading skeletons, a Desk route, console errors. It does not see design: look
+loading skeletons, a Desk route, console errors; after them, a ring drawn
+off screen (its control below a sheet's fold: the step must reveal it). It does not see design: look
 at every frame of the contact sheet (old looks, placeholder icons, empty
 states, real names) and write what you saw at the end of `DEFECTS.md`. Each
 run writes its own note under «Revisión a ojo» (when, how many shots, a box

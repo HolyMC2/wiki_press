@@ -91,16 +91,11 @@ export function glideMs(distance) {
 /*
  * Runs in the page: finds the scroller of `els[0]`, the bars over it, and
  * returns a plan for pickScroll. The scroller is kept on window.__guiaScroller
- * for glideScroll. Targets inside a sticky or fixed bar never need a scroll.
+ * for glideScroll. Targets inside a sticky or fixed bar of their own scroller
+ * never need a scroll; a whole fixed panel that scrolls inside (a bottom
+ * sheet) is not such a bar: its content is revealed in its own scroller.
  */
 export function measureScroll({ els }) {
-  const pinned = (el) => {
-    for (let n = el; n && n !== document.body; n = n.parentElement) {
-      const pos = getComputedStyle(n).position
-      if (pos === 'sticky' || pos === 'fixed') return n
-    }
-    return null
-  }
   const scrollerOf = (el) => {
     for (let n = el?.parentElement; n && n !== document.body; n = n.parentElement) {
       const oy = getComputedStyle(n).overflowY
@@ -108,7 +103,15 @@ export function measureScroll({ els }) {
     }
     return document.scrollingElement
   }
-  const scroller = scrollerOf(els.find(el => el && !pinned(el)) || els[0])
+  const scroller = scrollerOf(els.find(Boolean))
+  // Sticky or fixed between the element and its scroller: it does not move with the scroll.
+  const pinned = (el) => {
+    for (let n = el; n && n !== scroller && n !== document.body; n = n.parentElement) {
+      const pos = getComputedStyle(n).position
+      if (pos === 'sticky' || pos === 'fixed') return n
+    }
+    return null
+  }
   window.__guiaScroller = scroller
   const root = scroller === document.scrollingElement
   const r = root ? { top: 0, bottom: window.innerHeight } : scroller.getBoundingClientRect()

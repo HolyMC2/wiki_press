@@ -43,7 +43,21 @@ async function boxOf(tab, target) {
   return box
 }
 
-/** Draw `marks` over the page. Call `clearMarks` before the next step's actions. */
+/**
+ * Numbers of the ring marks that do not show whole on screen (pure: tested). A
+ * ring around a control scrolled out of view (below a sheet's fold, under a
+ * bar) would point at nothing in the shot; its step must reveal it first.
+ */
+export function offscreenMarks(resolved, { width, height }, slack = 2) {
+  return resolved
+    .filter(mark => mark.ring && (mark.ring.y < -slack || mark.ring.x < -slack || mark.ring.y + mark.ring.height > height + slack || mark.ring.x + mark.ring.width > width + slack || !mark.ring.height))
+    .map(mark => mark.n ?? '·')
+}
+
+/**
+ * Draw `marks` over the page. Call `clearMarks` before the next step's actions.
+ * Returns the marks as drawn (boxes in viewport pixels).
+ */
 export async function drawMarks(tab, marks, { seed = 7 } = {}) {
   const resolved = []
   for (const mark of marks) {
@@ -58,6 +72,7 @@ export async function drawMarks(tab, marks, { seed = 7 } = {}) {
   const { width, height } = tab.viewportSize()
   for (const [index, at] of placeBubbles(resolved, obstacles, { width, height })) resolved[index].bubble = at
   await tab.evaluate(paint, { marks: resolved, ink: INK, seed })
+  return resolved
 }
 
 /*

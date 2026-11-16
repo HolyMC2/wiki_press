@@ -25,6 +25,12 @@
  *     ysi: [['¿Y si …?', 'respuesta'], …],    3–5 real cases
  *     asistente: '¿…?',                      what to ask the assistant
  *     help: [{ context_type, context_key }], Wiki Help Mapping rows
+ *     manual: 'bancos',                      the app's manual it belongs to (manuales/<manual>.manual.mjs)
+ *     nivel: 1,                              1 lo básico · 2 el día a día · 3 cuando algo sale mal · 4 para el encargado o dueño
+ *     titulo: 'Ligar lo que ya está',        short title for the in-app card (default: the question)
+ *     soporte: ['…'],                        «Para soporte»: what Muelle support asks and checks
+ *     tecnico: 'crm/docs/DINERO_EN_ORDEN.md', the feature's technical doc (<repo>/<path>), for the knowledge archive
+ *     playbook: 'bank-reconciliation',       an existing bot playbook that answers this job: it gets only the guide's marker
  *     allowEnglish: ['…'],                   words the English probe may ignore
  *     busy: ['Buscando', '…'],               in-between texts every step waits out
  *   }
@@ -36,6 +42,13 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 export const FORMATS = ['phone', 'desktop', 'desktop-wide']
+// The levels of a manual (PLAN §12.3): complexity in steps, never in one go.
+export const NIVELES = {
+  1: 'Lo básico',
+  2: 'El día a día',
+  3: 'Cuando algo sale mal',
+  4: 'Para el encargado o dueño',
+}
 export const MAX_STEPS = 8
 export const MAX_RESUMEN = 3
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -61,7 +74,9 @@ export function validateGuide(guide, { area, slug } = {}) {
   for (const [index, step] of (guide.steps || []).entries()) {
     const at = `paso ${index + 1}`
     need(typeof step.text === 'string' || typeof step.text === 'function', `${at}: falta text`)
-    need(step.route || step.action, `${at}: necesita route o action`)
+    // A step may go on from the screen the previous step's `after` opened.
+    const goesOn = index > 0 && typeof guide.steps[index - 1].after === 'function'
+    need(step.route || step.action || goesOn, `${at}: necesita route o action (o un after en el paso anterior)`)
     if (step.route) need(typeof step.route === 'function' || (typeof step.route === 'string' && step.route.startsWith('/')), `${at}: route empieza con / (o es una función de los datos)`)
     if (typeof step.route === 'string') need(!/^\/app(\/|$)/.test(step.route), `${at}: lleva a Desk (/app); las guías van por la app`)
     if (step.action) need(typeof step.action === 'function', `${at}: action es una función (w, data)`)
@@ -81,6 +96,13 @@ export function validateGuide(guide, { area, slug } = {}) {
   if (guide.ysi !== undefined) {
     need(Array.isArray(guide.ysi) && guide.ysi.every(pair => Array.isArray(pair) && pair.length === 2), 'ysi: pares [pregunta, respuesta]')
   }
+  if (guide.manual !== undefined) need(SLUG.test(guide.manual || ''), 'manual: el id del manual de la app (minúsculas y guiones)')
+  if (guide.nivel !== undefined) need(Object.hasOwn(NIVELES, guide.nivel), 'nivel: 1, 2, 3 o 4')
+  need((guide.manual === undefined) === (guide.nivel === undefined), 'manual y nivel van juntos')
+  if (guide.titulo !== undefined) need(typeof guide.titulo === 'string' && guide.titulo.trim().length > 0 && guide.titulo.length <= 60, 'titulo: hasta 60 caracteres')
+  if (guide.soporte !== undefined) need(Array.isArray(guide.soporte) && guide.soporte.every(line => typeof line === 'string' && line), 'soporte: lista de líneas')
+  if (guide.tecnico !== undefined) need(typeof guide.tecnico === 'string' && /^[a-z0-9_-]+\/\S+$/.test(guide.tecnico), 'tecnico: <repo>/<ruta> del documento técnico')
+  if (guide.playbook !== undefined) need(typeof guide.playbook === 'string' && SLUG.test(guide.playbook), 'playbook: el nombre del playbook existente (sin .md)')
   for (const row of guide.help || []) {
     need(row && typeof row.context_type === 'string' && typeof row.context_key === 'string', 'help: filas { context_type, context_key }')
   }

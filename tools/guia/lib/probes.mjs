@@ -93,8 +93,11 @@ function probeFrame() {
     if (!visible(el)) continue
     const text = el.innerText?.replace(/\s+/g, ' ').trim()
     if (!text) continue
+    // Floating: under a fixed box of its own (a toast). A status line inside a
+    // dialog or bottom sheet (role=dialog, itself fixed) is part of that screen.
     let floating = false
     for (let p = el; p && p !== document.body; p = p.parentElement) {
+      if (p !== el && p.getAttribute('role') === 'dialog') break
       if (getComputedStyle(p).position === 'fixed') { floating = true; break }
     }
     ;(floating ? out.toasts : out.alerts).push(text)

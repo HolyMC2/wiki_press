@@ -10,10 +10,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawn, execFileSync } from 'node:child_process'
-import { openSession, readSecret, siteBase, checkSite, loadPlaywright } from './session.mjs'
+import { openSession, readSecret, walkBase, loadPlaywright } from './session.mjs'
 import { resolveFixture } from './fixtures.mjs'
 import { walker, runStep, finishStep, applyRename, installRename } from './walker.mjs'
-import { installResponseRename } from './rewrite.mjs'
+import { installResponseRename, installAnswers } from './rewrite.mjs'
 import { drawMarks, clearMarks } from './marks.mjs'
 import { plainText, resolve } from './guide.mjs'
 import { guideDirs, ensure, writeJson, videoName, posterName } from './paths.mjs'
@@ -185,10 +185,9 @@ export function filterGraph(L, steps, body) {
   return chain.join(';')
 }
 
-export async function video(guide, { out, site, fixtures, log = console.log }) {
+export async function video(guide, { out, site, base: preview, fixtures, log = console.log }) {
   const secret = readSecret()
-  const base = siteBase(secret.base, site)
-  const siteLabel = checkSite(base)
+  const { base, label: siteLabel } = walkBase(secret, { site, base: preview })
   const dirs = guideDirs(out, guide)
   ensure(dirs.video)
   const parts = ensure(path.join(dirs.video, 'parts'))
@@ -202,8 +201,9 @@ export async function video(guide, { out, site, fixtures, log = console.log }) {
     const session = await openSession(browser, { base, user: secret.user, password: secret.password, format: guide.format, video: true })
     const { context, page: tab, size } = session
     screen = [even(size.width * size.scale), even(size.height * size.scale)]
-    const { data, rename } = await resolveFixture(fixtures, guide.fixture, { context, base, args: guide.fixtureArgs || {} })
+    const { data, rename, answers } = await resolveFixture(fixtures, guide.fixture, { context, base, args: guide.fixtureArgs || {} })
     await installResponseRename(context, base, rename)
+    await installAnswers(context, base, answers, rename)
     await installRename(context, rename)
     const w = walker(tab, base, { video: true })
     // The first screen loads and settles before recording starts, so the video

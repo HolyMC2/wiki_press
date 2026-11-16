@@ -181,3 +181,15 @@ test('DEFECTS.md says what blocks and lists each step', () => {
   assert.match(md, /- \*\*bloquea\*\* · aviso: toast/)
   assert.match(md, /## Paso 2[^\n]*\n\nSin hallazgos/)
 })
+
+test('a ring outside the screen is reported by its number', async () => {
+  const { offscreenMarks } = await import('../lib/marks.mjs')
+  const screen = { width: 412, height: 915 }
+  const marks = [
+    { n: 1, ring: { x: 20, y: 100, width: 300, height: 44 } },
+    { n: 2, ring: { x: 20, y: 990, width: 300, height: 44 } },
+    { n: 3, ring: { x: 20, y: 890, width: 300, height: 44 } },
+    { note: 'Toca aquí', to: { x: 0, y: 2000, width: 1, height: 1 } },
+  ]
+  assert.deepEqual(offscreenMarks(marks, screen), [2, 3])
+})

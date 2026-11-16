@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 export const TOOL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 export const DEFAULT_GUIDES = path.join(TOOL, 'guides')
 export const DEFAULT_FIXTURES = path.join(TOOL, 'fixtures')
+export const DEFAULT_MANUALES = path.join(TOOL, 'manuales')
 export const DEFAULT_OUT = process.env.GUIA_OUT || path.resolve(TOOL, '../../.scratch/guia')
 
 /** The wiki stores images flat under /files, so every name carries area and slug. */
