@@ -58,6 +58,11 @@ export default {
         // The lab answers 429 to a burst; let caja's own reads finish first.
         await w.quiet({ idle: 2000, timeout: 20000 })
         await w.tap(VOLVER)
+        // A read the lab refuses (429) offers «Reintentar»; take it until the receipts show.
+        for (let i = 0; i < 4 && !(await w.showing(RECIBOS)); i++) {
+          await w.page.waitForTimeout(2000)
+          if (await w.showing('text=Reintentar')) await w.tapText('Reintentar')
+        }
         await w.wait(RECIBOS, 60000)
       },
     },

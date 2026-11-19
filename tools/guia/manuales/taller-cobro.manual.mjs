@@ -8,6 +8,6 @@ export default {
     1: { aprendes: 'Cobrar el anticipo, poner la pieza en la orden y cobrar la orden lista.', guias: ['taller/anticipo-en-caja', 'taller/agregar-pieza', 'taller/cobrar-orden-en-caja'] },
     2: { aprendes: 'Cambiar el precio de una pieza o de la mano de obra sin que se descuadre el cobro.', guias: ['taller/cambiar-precio'] },
     3: { aprendes: 'Qué hacer cuando caja ya cargó el cobro, la orden no cuadra o la pieza ya se vendió.', guias: [] },
-    4: { aprendes: 'Encender el cobro en caja y decidir quién cambia precios.', guias: [] },
+    4: { aprendes: 'Encender el cobro en caja y poner el WhatsApp de la tienda en los tickets.', guias: ['taller/encender-cobro-caja', 'taller/whatsapp-en-tickets'] },
   },
 }

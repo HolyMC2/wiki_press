@@ -98,7 +98,7 @@ export default {
   ],
   ysi: [
     ['¿Y si no me deja cambiar el precio?', 'Te sale «Proponer precio»: escribe el precio y el motivo; el encargado lo aprueba y se aplica solo.'],
-    ['¿Y si caja ya había cargado el cobro?', 'Caja libera ese cobro en «Cobros pendientes» › «Liberar borrador» y lo vuelve a cargar desde «Orden de servicio»: entra con el precio nuevo.'],
+    ['¿Y si caja ya había cargado el cobro?', 'Que caja vuelva a tocar «Cobrar» en Orden de servicio: si aún no se pagó nada, entra con el precio nuevo y avisa «La orden cambió en Taller».'],
     ['¿Y si el cliente pide descuento en caja?', 'En caja el precio de la orden no se cambia. Haz el descuento aquí, en la orden, y caja vuelve a cargar el cobro.'],
     ['¿Y si quiero cambiar la cotización?', '«Cobrar …» cambia el total; mándale al cliente la nueva cotización para que la apruebe.'],
   ],

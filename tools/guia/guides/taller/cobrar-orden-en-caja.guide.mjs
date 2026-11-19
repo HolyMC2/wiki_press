@@ -104,7 +104,7 @@ export default {
     },
   ],
   ysi: [
-    ['¿Y si el cliente quiere un descuento o el precio está mal?', 'En caja no se cambia: la línea dice «Este precio viene de la orden». Que lo cambien en Taller y vuelve a cargar el cobro.'],
+    ['¿Y si el cliente quiere un descuento o el precio está mal?', 'En caja no se cambia: la línea dice «Este precio viene de la orden». Que lo cambien en Taller y vuelve a tocar «Cobrar»: entra con el precio nuevo.'],
     ['¿Y si la orden dice «anticipo sin recibo de caja»?', 'Ese dinero no se cobró en caja (quizá en otro ticket). Revisa los tickets del cliente en Cobranza antes de cobrar.'],
     ['¿Y si caja dice que la orden ya se vendió?', 'Sus piezas salieron en otro ticket. Cobra lo que falte en Cobranza contra ese ticket y entrega la orden desde Taller.'],
     ['¿Y si el cliente también compra un accesorio?', 'Agrégalo a la misma venta: lo que agregas sí se puede cambiar.'],

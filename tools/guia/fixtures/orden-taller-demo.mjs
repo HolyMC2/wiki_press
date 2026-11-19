@@ -5,7 +5,7 @@
  * The «Anticipos y cobro de una orden» guides walk ONE order from reception to
  * the charge: anticipo in caja, the part, its price, the charge. Every shoot
  * starts on a fresh demo order seeded on a lab tenant with demo data only
- * (customer «Carmen Ruiz», a «Pantalla Honor X7A» in stock); this fixture only
+ * (customer «Sofía Ramos», a «Pantalla Honor X7A» in stock); this fixture only
  * reads it.
  */
 const list = (get, doctype, filters, fields, extra = {}) =>
@@ -15,7 +15,7 @@ export default {
   name: 'orden-taller-demo',
   describe: 'La orden de demostración más nueva y su cobro en caja.',
   async resolve({ get, args }) {
-    const customer = args.cliente || 'Carmen Ruiz'
+    const customer = args.cliente || 'Sofía Ramos'
     const [order] = (await list(get, 'Repair Order', { customer }, ['name', 'status', 'quote_amount'])) || []
     if (!order) throw new Error(`no hay orden de «${customer}»: siembra una orden demo en el sitio de laboratorio`)
     const [request] = (await list(get, 'POS Charge Request', { reference_doctype: 'Repair Order', reference_name: order.name, status: 'Open' }, ['name'])) || []
