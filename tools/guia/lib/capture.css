@@ -12,6 +12,10 @@ button:has(> .lucide-bell) > .bg-surface-red-7,
 [data-testid="shell-header"] .rounded-full.bg-surface-red-7,
 [data-testid="shell-command-bar"] .rounded-full.bg-surface-red-7,
 nav .rounded-full.bg-surface-red-7,
+/* The register's (posawesome) bell count, and its «Todo guardado» save mark:
+   the capture account's own unread notices and sync state, not the screen. */
+.notification-bell-trigger .v-badge__badge,
+[data-testid="shop-status-mark"],
 /* Mi cuenta's notice (invoice past due, suspension) for the lab's plan. */
 [data-testid="shell-cuenta-aviso"],
 /* A search's «recently edited» list (Etiquetas: «Editados hace poco»): other

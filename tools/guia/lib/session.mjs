@@ -215,6 +215,9 @@ export async function openSession(browser, { base, user, password, format, video
     timezoneId: 'America/Mazatlan',
     serviceWorkers: 'block',
     ...(f.mobile ? { userAgent: PHONE_AGENT, isMobile: true, hasTouch: true } : {}),
+    // A browser state saved from a walk (GUIA_STATE): the register's device
+    // already joined to the bot's open shift, so caja screens open on a sale.
+    ...(process.env.GUIA_STATE ? { storageState: process.env.GUIA_STATE } : {}),
   })
   await context.addInitScript(CAPTURE_SCRIPT)
   await context.addInitScript(MASK_SCRIPT)

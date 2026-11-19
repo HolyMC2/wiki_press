@@ -54,6 +54,12 @@ shell or the output. Login is a POST to `/api/method/login`, not a one-time
 link: those are limited to a few per hour and burn out on repeated walks.
 `mumu-mirror`, `demo` and `clinica` are refused.
 
+A caja guide needs a register device already joined to the bot's open shift (a
+fresh browser is a new device and the register asks to open a shift). Save the
+state of a browser that joined it (`context.storageState({ path })`, in the
+lane's `.scratch/`, never in git: it holds a session) and pass it as
+`GUIA_STATE=<file>`; the login still runs on top of it.
+
 ### Demo data
 
 A guide names a fixture (`fixtures/<name>.mjs`). Fixtures only read the site
